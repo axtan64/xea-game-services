@@ -1,0 +1,82 @@
+# docker-compose.yml
+networks:
+  internal:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=mining
+      - POSTGRES_PASSWORD=mining
+      - POSTGRES_DB=mining
+    ports:
+      - "5432:5432"   # exposed so `prisma migrate` can be run from the host
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  # Free Cloudflare Quick Tunnel - no account/domain needed, but the hostname is randomly
+  # regenerated on every restart (check `docker compose logs cloudflared` for the current URL).
+  # Swap this for a named tunnel (stable custom hostname) once a domain is set up.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://gateway:3000
+    restart: unless-stopped
+    networks:
+      - internal
+    depends_on:
+      - gateway
+
+  gateway:
+    build: ../gateway
+    restart: unless-stopped
+    networks:
+      - internal   # no public port - only reachable via cloudflared
+    environment:
+      - PROXY_SERVICE_URL=http://proxy:3004
+      - USERS_SERVICE_URL=http://users:3005
+      - DISCORD_WEBHOOK_SERVICE_URL=http://discord-webhook:3006
+      - COMMUNICATION_SERVICE_URL=http://communication:3000
+      - ROBLOX_AUTH=${ROBLOX_AUTH}
+
+  proxy:
+    build: ../services/proxy
+    restart: unless-stopped
+    networks:
+      - internal   # no ports: exposed publicly, internal only
+
+  users:
+    build:
+      context: ..
+      dockerfile: services/users/Dockerfile
+    restart: unless-stopped
+    networks:
+      - internal   # same
+    environment:
+      - PORT=3005
+      - DATABASE_URL=postgresql://mining:mining@postgres:5432/mining
+    depends_on:
+      - postgres
+
+  discord-webhook:
+    build: ../services/discord-webhook
+    restart: unless-stopped
+    networks:
+      - internal   # same
+    environment:
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+
+  communication:
+    build: ../services/communication
+    restart: unless-stopped
+    networks:
+      - internal   # same
+    environment:
+      - ROBLOX_UNIVERSE_ID=${ROBLOX_UNIVERSE_ID}
+      - ROBLOX_OPEN_CLOUD_API_KEY=${ROBLOX_OPEN_CLOUD_API_KEY}
+
+volumes:
+  postgres-data:

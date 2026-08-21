@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "PlayerStats" ADD COLUMN     "highestLevel" INTEGER NOT NULL DEFAULT 1,
+ADD COLUMN     "progress" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "selectedLevel" INTEGER NOT NULL DEFAULT 1,
+ADD COLUMN     "totalBlocksMined" INTEGER NOT NULL DEFAULT 0;

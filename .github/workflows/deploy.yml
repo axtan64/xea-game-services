@@ -1,0 +1,35 @@
+name: Deploy to Pi
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, pi]
+    steps:
+      - name: Sync to latest main
+        working-directory: /home/archie/Desktop/xea-game-services
+        run: |
+          git fetch origin
+          git reset --hard origin/main
+
+      - name: Build images
+        working-directory: /home/archie/Desktop/xea-game-services/deployment
+        run: docker compose build
+
+      - name: Run database migrations
+        working-directory: /home/archie/Desktop/xea-game-services/deployment
+        run: docker compose run --rm -w /app/shared/database users npx --yes prisma migrate deploy
+
+      - name: Deploy
+        working-directory: /home/archie/Desktop/xea-game-services/deployment
+        run: docker compose up -d
+
+      - name: Show current tunnel URL
+        working-directory: /home/archie/Desktop/xea-game-services/deployment
+        run: |
+          sleep 5
+          URL=$(docker compose logs cloudflared 2>&1 | grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' | tail -n 1)
+          echo "Current Cloudflare tunnel URL: ${URL:-not found yet - check 'docker compose logs cloudflared' on the Pi}"
