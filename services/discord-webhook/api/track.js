@@ -44,6 +44,10 @@ const trackRouter = Router();
  */
 trackRouter.post('/', async (req, res) => {
     const { userId, username, roles } = req.body;
+    const webhookUrl = req.headers['x-discord-webhook-url'];
+
+    if (!webhookUrl)
+        return res.status(400).json({ error: 'This game has no Discord webhook configured - set discordWebhookUrl on its Game row' });
 
     if (!userId || !username || !Array.isArray(roles) || roles.length === 0)
         return res.status(400).json({ error: 'userId, username, and a non-empty roles array are required' });
@@ -55,7 +59,7 @@ trackRouter.post('/', async (req, res) => {
 
     try {
         const embed = await buildTrackEmbed({ userId, username, roles: validRoles });
-        await sendWebhookEmbed(embed, DEVELOPER);
+        await sendWebhookEmbed(webhookUrl, embed, DEVELOPER);
         res.json({ success: true });
     } catch (err) {
         console.error('Error sending track webhook:', err);

@@ -43,6 +43,11 @@ const announceRouter = Router();
  */
 announceRouter.post('/', async (req, res) => {
     const { userId, message } = req.body ?? {};
+    const universeId = req.headers['x-roblox-universe-id'];
+    const apiKey = req.headers['x-roblox-open-cloud-api-key'];
+
+    if (!universeId || !apiKey)
+        return res.status(400).json({ error: 'This game has no MessagingService configuration - set robloxUniverseId/robloxOpenCloudApiKey on its Game row' });
 
     if (typeof userId !== 'string' && typeof userId !== 'number')
         return res.status(400).json({ error: 'userId is required' });
@@ -51,7 +56,7 @@ announceRouter.post('/', async (req, res) => {
         return res.status(400).json({ error: 'message is required' });
 
     try {
-        await publishAnnouncement(userId, message);
+        await publishAnnouncement(universeId, apiKey, userId, message);
         res.status(204).send();
     } catch (err) {
         if (err instanceof RangeError)

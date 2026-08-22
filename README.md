@@ -1,6 +1,6 @@
 # Xea's Game Services
 
-Shared backend (gateway + microservices) for Xea's Roblox games, split out of [xea-mining-incremental](https://github.com/axtan64/xea-mining-incremental) so it isn't tied to one game's repo.
+Shared backend (gateway + microservices) for Xea's Roblox games. This document is a brief summary of what's going on!
 
 ## Infrastructure
 
@@ -18,7 +18,7 @@ Outside of the services, `shared/` holds packages installed across multiple serv
 - `logger/` - Logs to console and files, with different log levels
 - `database/` - Initialises a Prisma/Postgres connection and performs queries
 
-**Heads up:** every service currently assumes there's exactly one Roblox game on the other end (one auth token, one universe ID). See `CLAUDE.md` for more on that and what each service actually does.
+**Multi-tenant:** each game gets its own `Game` row (own gateway token, Roblox universe/Open Cloud key, Discord webhook) instead of sharing one set of env vars. The gateway resolves the caller's token to a game and forwards its config downstream as headers. Onboard a new game with `npm run create-game -- <slug> <name>` from `shared/database`.
 
 ## Deployment
 

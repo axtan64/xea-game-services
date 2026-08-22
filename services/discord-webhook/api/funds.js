@@ -39,6 +39,10 @@ const fundsRouter = Router();
  */
 fundsRouter.post('/', async (req, res) => {
     const { groupName, pending, total } = req.body;
+    const webhookUrl = req.headers['x-discord-webhook-url'];
+
+    if (!webhookUrl)
+        return res.status(400).json({ error: 'This game has no Discord webhook configured - set discordWebhookUrl on its Game row' });
 
     if (!groupName || typeof pending !== 'number' || typeof total !== 'number') {
         return res.status(400).json({ error: 'groupName, pending (number), and total (number) are required' });
@@ -46,7 +50,7 @@ fundsRouter.post('/', async (req, res) => {
 
     try {
         const embed = await buildFundsEmbed({ groupName, pending, total });
-        await sendWebhookEmbed(embed);
+        await sendWebhookEmbed(webhookUrl, embed);
         res.json({ success: true });
     } catch (err) {
         console.error('Error sending funds webhook:', err);

@@ -8,6 +8,7 @@
     "generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
+    "create-game": "node scripts/createGame.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

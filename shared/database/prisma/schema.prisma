@@ -6,39 +6,79 @@ generator client {
     provider = "prisma-client-js"
 }
 
+// Encapsulates a game using this backend.
+model Game {
+    id                    String            @id @default(uuid())
+    slug                  String            @unique
+    name                  String
+    gatewayTokenHash      String            @unique
+    robloxUniverseId      BigInt?
+    robloxOpenCloudApiKey String?
+    discordWebhookUrl     String?
+    createdAt             DateTime          @default(now())
+    updatedAt             DateTime          @updatedAt
+    memberships           GameMembership[]
+    purchases             Purchase[]
+}
+
+// A Roblox account's identity
 model User {
-    id            String      @id @default(uuid())
-    robloxId      BigInt      @unique
-    createdAt     DateTime    @default(now())
-    updatedAt     DateTime    @updatedAt
-    bannedAt      DateTime?
-    banReason     String?
-    banExpiresAt  DateTime?
-    isAdmin       Boolean     @default(false)
-    metadata      Json?
-    purchases     Purchase[]
+    id          String            @id @default(uuid())
+    robloxId    BigInt            @unique
+    createdAt   DateTime          @default(now())
+    updatedAt   DateTime          @updatedAt
+    metadata    Json?
+    purchases   Purchase[]
+    memberships GameMembership[]
+}
+
+// Per-(game, user) moderation/role state
+model GameMembership {
+    id           String    @id @default(uuid())
+    game         Game      @relation(fields: [gameId], references: [id])
+    gameId       String
+    user         User      @relation(fields: [userId], references: [id])
+    userId       String
+    isAdmin      Boolean   @default(false)
+    bannedAt     DateTime?
+    banReason    String?
+    banExpiresAt DateTime?
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+
+    @@unique([gameId, userId])
 }
 
 model Purchase {
-    id          String      @id @default(uuid())
-    user        User        @relation(fields: [userId], references: [id])
+    id          String   @id @default(uuid())
+    game        Game     @relation(fields: [gameId], references: [id])
+    gameId      String
+    user        User     @relation(fields: [userId], references: [id])
     userId      String
     productId   BigInt
     priceRobux  Int
-    purchasedAt DateTime    @default(now())
+    purchasedAt DateTime @default(now())
     metadata    Json?
 }
 
-// Deliberately standalone (no relation to User) so it can be created from just a
-// Roblox ID, with no dependency on a User row (and therefore a username) existing first.
-model PlayerStats {
-    robloxId          BigInt      @id
-    level             Int         @default(1)
-    gold              String      @default("0;0")
-    highestLevel      Int         @default(1)
-    selectedLevel     Int         @default(1)
-    progress          Int         @default(0)
-    totalBlocksMined  Int         @default(0)
-    createdAt         DateTime    @default(now())
-    updatedAt         DateTime    @updatedAt
+// User Data for Xea's Mining Game
+model MiningPlayerStats {
+    robloxId         BigInt   @id
+    level            Int      @default(1)
+    gold             String   @default("0;0")
+    highestLevel     Int      @default(1)
+    selectedLevel    Int      @default(1)
+    progress         Int      @default(0)
+    totalBlocksMined Int      @default(0)
+    createdAt        DateTime @default(now())
+    updatedAt        DateTime @updatedAt
+}
+
+// User Data for Xea's Donation Game
+model DonationPlayerStats {
+    robloxId       BigInt   @id
+    credits        Int      @default(0)
+    unclaimedRobux Int      @default(0)
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
 }

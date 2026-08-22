@@ -18,9 +18,7 @@ services:
     networks:
       - internal
 
-  # Free Cloudflare Quick Tunnel - no account/domain needed, but the hostname is randomly
-  # regenerated on every restart (check `docker compose logs cloudflared` for the current URL).
-  # Swap this for a named tunnel (stable custom hostname) once a domain is set up.
+  # Free Cloudflare Quick Tunnel. Swap for a named tunnel when you set up a domain...
   cloudflared:
     image: cloudflare/cloudflared:latest
     command: tunnel --no-autoupdate --url http://gateway:3000
@@ -31,7 +29,9 @@ services:
       - gateway
 
   gateway:
-    build: ../gateway
+    build:
+      context: ..
+      dockerfile: gateway/Dockerfile
     restart: unless-stopped
     networks:
       - internal   # no public port - only reachable via cloudflared
@@ -40,7 +40,9 @@ services:
       - USERS_SERVICE_URL=http://users:3005
       - DISCORD_WEBHOOK_SERVICE_URL=http://discord-webhook:3006
       - COMMUNICATION_SERVICE_URL=http://communication:3000
-      - ROBLOX_AUTH=${ROBLOX_AUTH}
+      - DATABASE_URL=postgresql://mining:mining@postgres:5432/mining
+    depends_on:
+      - postgres
 
   proxy:
     build: ../services/proxy
@@ -66,17 +68,12 @@ services:
     restart: unless-stopped
     networks:
       - internal   # same
-    environment:
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
 
   communication:
     build: ../services/communication
     restart: unless-stopped
     networks:
       - internal   # same
-    environment:
-      - ROBLOX_UNIVERSE_ID=${ROBLOX_UNIVERSE_ID}
-      - ROBLOX_OPEN_CLOUD_API_KEY=${ROBLOX_OPEN_CLOUD_API_KEY}
 
 volumes:
   postgres-data:

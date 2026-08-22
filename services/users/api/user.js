@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { PlayerStats, UnknownStatFieldError, User } = require('database');
+const { GameMembership, UnknownStatFieldError } = require('database');
 
 const userRouter = Router();
 
@@ -13,19 +13,14 @@ function isPlainObject(value) {
  *   schemas:
  *     PlayerStats:
  *       type: object
- *       properties:
- *         level:
- *           type: number
- *         gold:
- *           type: string
- *           description: Serialized BigNumber ("Layer;Exponent")
+ *       description: Depends on the game, but will always be a flat object of key-value pairs
  */
 
 /**
  * @swagger
  * /{userId}:
  *   get:
- *     summary: Get a player's stats
+ *     summary: Get a player's stats for the calling game
  *     tags: [Users]
  *     parameters:
  *       - in: path
@@ -43,7 +38,7 @@ function isPlainObject(value) {
  *         description: No stats found for this user
  */
 userRouter.get('/:userId', async (req, res) => {
-    const stats = await PlayerStats.get(req.params.userId);
+    const stats = await req.stats.Model.get(req.params.userId);
 
     if (!stats)
         return res.status(404).json({ error: 'No stats found for this user' });
@@ -55,7 +50,7 @@ userRouter.get('/:userId', async (req, res) => {
  * @swagger
  * /{userId}:
  *   post:
- *     summary: Create a player's stats
+ *     summary: Create a player's stats for the calling game
  *     description: Fails if stats already exist for this user - use PUT to upsert instead.
  *     tags: [Users]
  *     parameters:
@@ -82,13 +77,13 @@ userRouter.post('/:userId', async (req, res) => {
     if (!isPlainObject(req.body))
         return res.status(400).json({ error: 'Body must be an object' });
 
-    const existing = await PlayerStats.get(userId);
+    const existing = await req.stats.Model.get(userId);
 
     if (existing)
         return res.status(409).json({ error: 'Stats already exist for this user' });
 
     try {
-        const stats = await PlayerStats.create(userId, req.body);
+        const stats = await req.stats.Model.create(userId, req.body);
         res.status(201).json(stats);
     } catch (err) {
         if (err instanceof UnknownStatFieldError) {
@@ -102,7 +97,7 @@ userRouter.post('/:userId', async (req, res) => {
  * @swagger
  * /{userId}:
  *   put:
- *     summary: Upsert a player's stats
+ *     summary: Upsert a player's stats for the calling game
  *     description: Creates stats for this user if none exist, merging the given fields onto any existing row otherwise.
  *     tags: [Users]
  *     parameters:
@@ -129,10 +124,10 @@ userRouter.put('/:userId', async (req, res) => {
     if (!isPlainObject(req.body))
         return res.status(400).json({ error: 'Body must be an object' });
 
-    const existed = Boolean(await PlayerStats.get(userId));
+    const existed = Boolean(await req.stats.Model.get(userId));
 
     try {
-        const stats = await PlayerStats.upsert(userId, req.body);
+        const stats = await req.stats.Model.upsert(userId, req.body);
         res.status(existed ? 200 : 201).json(stats);
     } catch (err) {
         if (err instanceof UnknownStatFieldError)
@@ -146,7 +141,7 @@ userRouter.put('/:userId', async (req, res) => {
  * @swagger
  * /{userId}:
  *   patch:
- *     summary: Update a player's stats
+ *     summary: Update a player's stats for the calling game
  *     description: Fails if no stats exist yet for this user - use PUT to upsert instead.
  *     tags: [Users]
  *     parameters:
@@ -173,13 +168,13 @@ userRouter.patch('/:userId', async (req, res) => {
     if (!isPlainObject(req.body))
         return res.status(400).json({ error: 'Body must be an object' });
 
-    const existing = await PlayerStats.get(userId);
+    const existing = await req.stats.Model.get(userId);
 
     if (!existing)
         return res.status(404).json({ error: 'No stats found for this user' });
 
     try {
-        const stats = await PlayerStats.update(userId, req.body);
+        const stats = await req.stats.Model.update(userId, req.body);
         res.json(stats);
     } catch (err) {
         if (err instanceof UnknownStatFieldError)
@@ -193,7 +188,7 @@ userRouter.patch('/:userId', async (req, res) => {
  * @swagger
  * /{userId}:
  *   delete:
- *     summary: Delete a player's stats
+ *     summary: Delete a player's stats for the calling game
  *     description: Resets this user's save data. Does not touch identity or purchase history.
  *     tags: [Users]
  *     parameters:
@@ -209,12 +204,12 @@ userRouter.patch('/:userId', async (req, res) => {
  *         description: No stats found for this user
  */
 userRouter.delete('/:userId', async (req, res) => {
-    const existing = await PlayerStats.get(req.params.userId);
+    const existing = await req.stats.Model.get(req.params.userId);
 
     if (!existing)
         return res.status(404).json({ error: 'No stats found for this user' });
 
-    await PlayerStats.delete(req.params.userId);
+    await req.stats.Model.delete(req.params.userId);
 
     res.status(204).send();
 });
@@ -238,8 +233,8 @@ userRouter.delete('/:userId', async (req, res) => {
  * @swagger
  * /{userId}/ban:
  *   post:
- *     summary: Ban a user
- *     description: Creates a User record for this Roblox ID if one doesn't exist yet. Omitting duration bans permanently.
+ *     summary: Ban a user from the calling game
+ *     description: Creates a User record for this Roblox ID if one doesn't exist yet. Omitting duration bans permanently. Bans are per-game.
  *     tags: [Users]
  *     parameters:
  *       - in: path
@@ -268,16 +263,16 @@ userRouter.post('/:userId/ban', async (req, res) => {
         return res.status(400).json({ error: 'duration must be a positive number of seconds' });
 
     const expiresAt = duration ? new Date(Date.now() + duration * 1000) : null;
-    const user = await User.ban(userId, { reason, expiresAt });
+    const membership = await GameMembership.ban(req.gameId, userId, { reason, expiresAt });
 
-    res.json(user);
+    res.json(membership);
 });
 
 /**
  * @swagger
  * /{userId}/ban:
  *   delete:
- *     summary: Unban a user
+ *     summary: Unban a user from the calling game
  *     tags: [Users]
  *     parameters:
  *       - in: path
@@ -289,15 +284,15 @@ userRouter.post('/:userId/ban', async (req, res) => {
  *       200:
  *         description: User unbanned successfully
  *       404:
- *         description: No user found for this ID
+ *         description: No membership found for this user in this game
  */
 userRouter.delete('/:userId/ban', async (req, res) => {
     try {
-        const user = await User.unban(req.params.userId);
-        res.json(user);
+        const membership = await GameMembership.unban(req.gameId, req.params.userId);
+        res.json(membership);
     } catch (err) {
         if (err.code === 'P2025')
-            return res.status(404).json({ error: 'No user found for this ID' });
+            return res.status(404).json({ error: 'No membership found for this user in this game' });
 
         throw err;
     }
@@ -327,8 +322,8 @@ userRouter.delete('/:userId/ban', async (req, res) => {
  * @swagger
  * /{userId}/account:
  *   get:
- *     summary: Get a user's account (moderation/identity) info
- *     description: Always returns 200 with defaults (isAdmin false, no ban) if this Roblox ID has no User row yet.
+ *     summary: Get a user's account (moderation/role) info for the calling game
+ *     description: Always returns 200 with defaults (isAdmin false, no ban) if this Roblox ID has no membership in this game yet.
  *     tags: [Users]
  *     parameters:
  *       - in: path
@@ -344,13 +339,13 @@ userRouter.delete('/:userId/ban', async (req, res) => {
  *             schema: { $ref: '#/components/schemas/Account' }
  */
 userRouter.get('/:userId/account', async (req, res) => {
-    const user = await User.getByRobloxId(req.params.userId);
+    const membership = await GameMembership.get(req.gameId, req.params.userId);
 
     res.json({
-        isAdmin: user ? user.isAdmin : false,
-        bannedAt: user ? user.bannedAt : null,
-        banReason: user ? user.banReason : null,
-        banExpiresAt: user ? user.banExpiresAt : null,
+        isAdmin: membership ? membership.isAdmin : false,
+        bannedAt: membership ? membership.bannedAt : null,
+        banReason: membership ? membership.banReason : null,
+        banExpiresAt: membership ? membership.banExpiresAt : null,
     });
 });
 
@@ -358,8 +353,8 @@ userRouter.get('/:userId/account', async (req, res) => {
  * @swagger
  * /{userId}/admin:
  *   post:
- *     summary: Grant a user admin privileges
- *     description: Creates a User record for this Roblox ID if one doesn't exist yet.
+ *     summary: Grant a user admin privileges in the calling game
+ *     description: Creates a User record for this Roblox ID if one doesn't exist yet. Admin grants are per-game.
  *     tags: [Users]
  *     parameters:
  *       - in: path
@@ -372,15 +367,15 @@ userRouter.get('/:userId/account', async (req, res) => {
  *         description: User granted admin successfully
  */
 userRouter.post('/:userId/admin', async (req, res) => {
-    const user = await User.makeAdmin(req.params.userId);
-    res.json(user);
+    const membership = await GameMembership.makeAdmin(req.gameId, req.params.userId);
+    res.json(membership);
 });
 
 /**
  * @swagger
  * /{userId}/admin:
  *   delete:
- *     summary: Revoke a user's admin privileges
+ *     summary: Revoke a user's admin privileges in the calling game
  *     tags: [Users]
  *     parameters:
  *       - in: path
@@ -392,15 +387,15 @@ userRouter.post('/:userId/admin', async (req, res) => {
  *       200:
  *         description: User's admin privileges revoked successfully
  *       404:
- *         description: No user found for this ID
+ *         description: No membership found for this user in this game
  */
 userRouter.delete('/:userId/admin', async (req, res) => {
     try {
-        const user = await User.removeAdmin(req.params.userId);
-        res.json(user);
+        const membership = await GameMembership.removeAdmin(req.gameId, req.params.userId);
+        res.json(membership);
     } catch (err) {
         if (err.code === 'P2025')
-            return res.status(404).json({ error: 'No user found for this ID' });
+            return res.status(404).json({ error: 'No membership found for this user in this game' });
 
         throw err;
     }

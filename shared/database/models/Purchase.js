@@ -5,9 +5,9 @@ class Purchase {
         return getClient().purchase.findUnique({ where: { id } });
     }
 
-    static create({ userId, productId, priceRobux, ...rest }) {
+    static create({ gameId, userId, productId, priceRobux, ...rest }) {
         return getClient().purchase.create({
-            data: { userId, productId: BigInt(productId), priceRobux, ...rest },
+            data: { gameId, userId, productId: BigInt(productId), priceRobux, ...rest },
         });
     }
 

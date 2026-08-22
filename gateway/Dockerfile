@@ -1,10 +1,14 @@
 FROM node:20-alpine
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install --omit=dev
+COPY shared/database ./shared/database
+RUN npm install --prefix shared/database --omit=dev
 
-COPY . .
+COPY gateway/package*.json ./gateway/
+RUN npm install --prefix gateway --omit=dev
 
+COPY gateway ./gateway
+
+WORKDIR /app/gateway
 EXPOSE 3000
 CMD ["node", "index.js"]

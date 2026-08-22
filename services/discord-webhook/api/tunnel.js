@@ -33,13 +33,17 @@ const tunnelRouter = Router();
  */
 tunnelRouter.post('/', async (req, res) => {
     const { url } = req.body;
+    const webhookUrl = req.headers['x-discord-webhook-url'];
+
+    if (!webhookUrl)
+        return res.status(400).json({ error: 'This game has no Discord webhook configured - set discordWebhookUrl on its Game row' });
 
     if (!url || typeof url !== 'string')
         return res.status(400).json({ error: 'url (string) is required' });
 
     try {
         const embed = await buildTunnelEmbed({ url });
-        await sendWebhookEmbed(embed);
+        await sendWebhookEmbed(webhookUrl, embed);
         res.json({ success: true });
     } catch (err) {
         console.error('Error sending tunnel webhook:', err);

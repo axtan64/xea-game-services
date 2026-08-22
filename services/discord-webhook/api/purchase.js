@@ -46,13 +46,17 @@ const purchaseRouter = Router();
  */
 purchaseRouter.post('/', async (req, res) => {
     const { userId, username, productName, robux, type } = req.body;
+    const webhookUrl = req.headers['x-discord-webhook-url'];
+
+    if (!webhookUrl)
+        return res.status(400).json({ error: 'This game has no Discord webhook configured - set discordWebhookUrl on its Game row' });
 
     if (!userId || !username || !productName || typeof robux !== 'number' || !['gamepass', 'devproduct'].includes(type))
         return res.status(400).json({ error: 'userId, username, productName, robux (number), and type (gamepass|devproduct) are required' });
 
     try {
         const embed = await buildPurchaseEmbed({ userId, username, productName, robux, type });
-        await sendWebhookEmbed(embed);
+        await sendWebhookEmbed(webhookUrl, embed);
         res.json({ success: true });
     } catch (err) {
         console.error('Error sending purchase webhook:', err);
