@@ -12,7 +12,15 @@ header forwarding in gateway/middleware/forwarder.js). To onboard a game:
 No environment variables are necessary for deployment here. Games can be registered to authenticate with the service instead.
 
 To setup a game:
-```cd shared/database && npm run create-game -- <slug> <name>```
+```bash
+cd shared/database && npm run create-game -- <slug> <name>
+```
+
+Update an existing game's properties by:
+```bash
+cd shared/database
+npm run update-game -- mining --token '<existing ROBLOX_AUTH>' --universe-id '<ROBLOX_UNIVERSE_ID>' --api-key '<ROBLOX_OPEN_CLOUD_API_KEY>' --webhook-url '<DISCORD_WEBHOOK_URL>
+```
 
 Then fill in that Game's robloxUniverseId/robloxOpenCloudApiKey/discordWebhookUrl via Game.update(slug, {...}).
 

@@ -28,7 +28,12 @@ class Game {
         });
     }
 
-    // Swap a game's gateway token without touching its other config
+    /**
+     * Set a new gateway token for the game. The token is hashed before being persisted, so the raw token is never stored in the database.
+     * @param {string} slug The slug (identifier) of the game to update.
+     * @param {string} gatewayToken The new raw gateway token to set for the game (will be hashed).
+     * @returns {Promise} A promise that resolves to the updated game record.
+     */
     static rotateToken(slug, gatewayToken) {
         return getClient().game.update({
             where: { slug },

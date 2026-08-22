@@ -1,4 +1,8 @@
 # docker-compose.yml
+
+# Consistent name for the deployment so that the folder name doesn't determine the network name (which would break the services if the folder is renamed)
+name: deployment
+
 networks:
   internal:
     driver: bridge
