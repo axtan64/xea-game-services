@@ -1,8 +1,4 @@
-Two kinds of config live outside the code, and they work differently:
-
-**Per-game config** (Roblox universe/Open Cloud key, gateway token) isn't in env vars at all -
-it's a `Game` row (see `shared/database/models/Game.js`), forwarded downstream by the gateway as
-`X-Game-*` headers. Nothing here needs it. To onboard a game:
+Authenticate a game (and retrieve its token) by using this command
 
 ```bash
 cd shared/database
