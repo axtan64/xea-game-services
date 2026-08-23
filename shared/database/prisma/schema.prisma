@@ -84,14 +84,15 @@ model DonationPlayerStats {
     updatedAt      DateTime @updatedAt
 }
 
-// Ledger of individual Robux gifts between players in the donation game
-model DonationGift {
-    id           String   @id @default(uuid())
+// Permanent ledger of Robux donations between players in the donation game
+model Donation {
+    id           String    @id @default(uuid())
     fromRobloxId BigInt
     toRobloxId   BigInt
     amount       Int
     message      String?
-    createdAt    DateTime @default(now())
+    claimedAt    DateTime?
+    createdAt    DateTime  @default(now())
 
     @@index([toRobloxId])
     @@index([fromRobloxId])

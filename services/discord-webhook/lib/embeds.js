@@ -19,7 +19,7 @@ const COLOR_TUNNEL = 0xf6821f;
  * Get the Discord footer embed for a particular game (to be attached to the embed to differentiate games and whatnot)
  */
 function gameFooter(gameSlug) {
-    return gameSlug ? { footer: { text: gameSlug } } : {};
+    return gameSlug ? { footer: { text: `source: ${gameSlug} game` } } : {};
 }
 
 async function buildTrackEmbed({ userId, username, roles, gameSlug }) {
