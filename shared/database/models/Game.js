@@ -15,7 +15,7 @@ class Game {
     }
 
     // gatewayToken is the raw token - only ever persisted hashed, see lib/hashToken.js
-    static create({ slug, name, gatewayToken, robloxUniverseId, robloxOpenCloudApiKey, discordWebhookUrl }) {
+    static create({ slug, name, gatewayToken, robloxUniverseId, robloxOpenCloudApiKey }) {
         return getClient().game.create({
             data: {
                 slug,
@@ -23,7 +23,6 @@ class Game {
                 gatewayTokenHash: hashGatewayToken(gatewayToken),
                 robloxUniverseId: robloxUniverseId != null ? BigInt(robloxUniverseId) : null,
                 robloxOpenCloudApiKey: robloxOpenCloudApiKey ?? null,
-                discordWebhookUrl: discordWebhookUrl ?? null,
             },
         });
     }
@@ -41,14 +40,13 @@ class Game {
         });
     }
 
-    static update(slug, { name, robloxUniverseId, robloxOpenCloudApiKey, discordWebhookUrl }) {
+    static update(slug, { name, robloxUniverseId, robloxOpenCloudApiKey }) {
         return getClient().game.update({
             where: { slug },
             data: {
                 ...(name !== undefined && { name }),
                 ...(robloxUniverseId !== undefined && { robloxUniverseId: robloxUniverseId != null ? BigInt(robloxUniverseId) : null }),
                 ...(robloxOpenCloudApiKey !== undefined && { robloxOpenCloudApiKey }),
-                ...(discordWebhookUrl !== undefined && { discordWebhookUrl }),
             },
         });
     }

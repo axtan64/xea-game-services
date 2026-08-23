@@ -3,6 +3,7 @@ const { sendWebhookEmbed } = require('../lib/discord');
 const { buildPurchaseEmbed } = require('../lib/embeds');
 
 const purchaseRouter = Router();
+const WEBHOOK_URL = process.env.PURCHASE_WEBHOOK_URL;
 
 /**
  * @swagger
@@ -46,17 +47,17 @@ const purchaseRouter = Router();
  */
 purchaseRouter.post('/', async (req, res) => {
     const { userId, username, productName, robux, type } = req.body;
-    const webhookUrl = req.headers['x-discord-webhook-url'];
 
-    if (!webhookUrl)
-        return res.status(400).json({ error: 'This game has no Discord webhook configured - set discordWebhookUrl on its Game row' });
+    if (!WEBHOOK_URL)
+        return res.status(500).json({ error: 'PURCHASE_WEBHOOK_URL is not configured' });
 
     if (!userId || !username || !productName || typeof robux !== 'number' || !['gamepass', 'devproduct'].includes(type))
         return res.status(400).json({ error: 'userId, username, productName, robux (number), and type (gamepass|devproduct) are required' });
 
     try {
-        const embed = await buildPurchaseEmbed({ userId, username, productName, robux, type });
-        await sendWebhookEmbed(webhookUrl, embed);
+        const gameSlug = req.headers['x-game-slug'];
+        const embed = await buildPurchaseEmbed({ userId, username, productName, robux, type, gameSlug });
+        await sendWebhookEmbed(WEBHOOK_URL, embed);
         res.json({ success: true });
     } catch (err) {
         console.error('Error sending purchase webhook:', err);

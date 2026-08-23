@@ -5,6 +5,7 @@ const { ROLE_CONFIG } = require('../lib/roles');
 const { DEVELOPER } = require('../resources/discord-roles');
 
 const trackRouter = Router();
+const WEBHOOK_URL = process.env.TRACK_WEBHOOK_URL;
 
 /**
  * @swagger
@@ -44,10 +45,9 @@ const trackRouter = Router();
  */
 trackRouter.post('/', async (req, res) => {
     const { userId, username, roles } = req.body;
-    const webhookUrl = req.headers['x-discord-webhook-url'];
 
-    if (!webhookUrl)
-        return res.status(400).json({ error: 'This game has no Discord webhook configured - set discordWebhookUrl on its Game row' });
+    if (!WEBHOOK_URL)
+        return res.status(500).json({ error: 'TRACK_WEBHOOK_URL is not configured' });
 
     if (!userId || !username || !Array.isArray(roles) || roles.length === 0)
         return res.status(400).json({ error: 'userId, username, and a non-empty roles array are required' });
@@ -58,8 +58,9 @@ trackRouter.post('/', async (req, res) => {
         return res.status(400).json({ error: `roles must include at least one of: ${Object.keys(ROLE_CONFIG).join(', ')}` });
 
     try {
-        const embed = await buildTrackEmbed({ userId, username, roles: validRoles });
-        await sendWebhookEmbed(webhookUrl, embed, DEVELOPER);
+        const gameSlug = req.headers['x-game-slug'];
+        const embed = await buildTrackEmbed({ userId, username, roles: validRoles, gameSlug });
+        await sendWebhookEmbed(WEBHOOK_URL, embed, DEVELOPER);
         res.json({ success: true });
     } catch (err) {
         console.error('Error sending track webhook:', err);

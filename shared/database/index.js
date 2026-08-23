@@ -6,6 +6,7 @@ const GameMembership = require('./models/GameMembership');
 const { UnknownStatFieldError } = require('./models/typedStats');
 const { MiningPlayerStats, STAT_FIELDS: MINING_STAT_FIELDS } = require('./models/MiningPlayerStats');
 const { DonationPlayerStats, STAT_FIELDS: DONATION_STAT_FIELDS } = require('./models/DonationPlayerStats');
+const DonationGift = require('./models/DonationGift');
 
 // Maps slugs (identifiers) to their model and fields
 const STATS_MODELS_BY_SLUG = {
@@ -23,6 +24,7 @@ module.exports = {
     MINING_STAT_FIELDS,
     DonationPlayerStats,
     DONATION_STAT_FIELDS,
+    DonationGift,
     STATS_MODELS_BY_SLUG,
     UnknownStatFieldError,
 };

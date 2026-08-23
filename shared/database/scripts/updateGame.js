@@ -3,8 +3,9 @@ require('dotenv').config();
 const { Game } = require('../index');
 
 /**
- * Usage: node scripts/updateGame.js <slug> [--token <raw>] [--universe-id <id>] [--api-key <key>] [--webhook-url <url>]
+ * Usage: node scripts/updateGame.js <slug> [--token <raw>] [--universe-id <id>] [--api-key <key>]
  * Only touches the fields whose flag is passed, and outputs the updated game record to the console
+ * Discord webhook URLs aren't a Game field - see services/discord-webhook/.env.example
  */
 function parseArgs(argv) {
     const [slug, ...rest] = argv;
@@ -18,15 +19,14 @@ function parseArgs(argv) {
         token: flags['--token'],
         universeId: flags['--universe-id'],
         apiKey: flags['--api-key'],
-        webhookUrl: flags['--webhook-url'],
     };
 }
 
 async function main() {
-    const { slug, token, universeId, apiKey, webhookUrl } = parseArgs(process.argv.slice(2));
+    const { slug, token, universeId, apiKey } = parseArgs(process.argv.slice(2));
 
-    if (!slug || (token === undefined && universeId === undefined && apiKey === undefined && webhookUrl === undefined)) {
-        console.error('Usage: node scripts/updateGame.js <slug> [--token <raw>] [--universe-id <id>] [--api-key <key>] [--webhook-url <url>]');
+    if (!slug || (token === undefined && universeId === undefined && apiKey === undefined)) {
+        console.error('Usage: node scripts/updateGame.js <slug> [--token <raw>] [--universe-id <id>] [--api-key <key>]');
         process.exitCode = 1;
         return;
     }
@@ -37,7 +37,6 @@ async function main() {
     const game = await Game.update(slug, {
         ...(universeId !== undefined && { robloxUniverseId: universeId }),
         ...(apiKey !== undefined && { robloxOpenCloudApiKey: apiKey }),
-        ...(webhookUrl !== undefined && { discordWebhookUrl: webhookUrl }),
     });
 
     console.log(game);

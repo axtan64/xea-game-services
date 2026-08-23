@@ -14,7 +14,6 @@ model Game {
     gatewayTokenHash      String            @unique
     robloxUniverseId      BigInt?
     robloxOpenCloudApiKey String?
-    discordWebhookUrl     String?
     createdAt             DateTime          @default(now())
     updatedAt             DateTime          @updatedAt
     memberships           GameMembership[]
@@ -79,6 +78,21 @@ model DonationPlayerStats {
     robloxId       BigInt   @id
     credits        Int      @default(0)
     unclaimedRobux Int      @default(0)
+    robuxRaised    Int      @default(0)
+    robuxDonated   Int      @default(0)
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
+}
+
+// Ledger of individual Robux gifts between players in the donation game
+model DonationGift {
+    id           String   @id @default(uuid())
+    fromRobloxId BigInt
+    toRobloxId   BigInt
+    amount       Int
+    message      String?
+    createdAt    DateTime @default(now())
+
+    @@index([toRobloxId])
+    @@index([fromRobloxId])
 }

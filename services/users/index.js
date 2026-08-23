@@ -21,8 +21,11 @@ const gameContext = require('./middleware/gameContext');
 
 // Routes
 const userRouter = require('./api/user');
+const giftsRouter = require('./api/gifts');
 
-app.use('/', gameContext, userRouter);
+app.use(gameContext);
+app.use('/gifts', giftsRouter); // mounted before '/' - userRouter's /:userId would otherwise swallow it
+app.use('/', userRouter);
 
 app.listen(PORT, () => {
     console.log(`Users server running on port ${PORT}`);

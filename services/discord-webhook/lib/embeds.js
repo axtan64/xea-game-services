@@ -15,7 +15,14 @@ const COLOR_PURCHASE = 0x2ecc71;
 const COLOR_FUNDS = 0x52acff;
 const COLOR_TUNNEL = 0xf6821f;
 
-async function buildTrackEmbed({ userId, username, roles }) {
+/**
+ * Get the Discord footer embed for a particular game (to be attached to the embed to differentiate games and whatnot)
+ */
+function gameFooter(gameSlug) {
+    return gameSlug ? { footer: { text: gameSlug } } : {};
+}
+
+async function buildTrackEmbed({ userId, username, roles, gameSlug }) {
     const thumbnailUrl = await getAvatarThumbnailUrl(userId);
 
     return {
@@ -23,11 +30,12 @@ async function buildTrackEmbed({ userId, username, roles }) {
         description: `[${username}](${profileUrl(userId)}) has joined the game!\n\n${formatRoleBullets(roles)}`,
         color: COLOR_TRACK,
         ...(thumbnailUrl && { thumbnail: { url: thumbnailUrl } }),
+        ...gameFooter(gameSlug),
         timestamp: new Date().toISOString(),
     };
 }
 
-async function buildPurchaseEmbed({ userId, username, productName, robux, type }) {
+async function buildPurchaseEmbed({ userId, username, productName, robux, type, gameSlug }) {
     const thumbnailUrl = await getAvatarThumbnailUrl(userId);
 
     return {
@@ -35,11 +43,12 @@ async function buildPurchaseEmbed({ userId, username, productName, robux, type }
         description: `[${username}](${profileUrl(userId)}) has purchased **${productName}** for ${robuxEmoji} **${robux.toLocaleString()}**`,
         color: COLOR_PURCHASE,
         ...(thumbnailUrl && { thumbnail: { url: thumbnailUrl } }),
+        ...gameFooter(gameSlug),
         timestamp: new Date().toISOString(),
     };
 }
 
-async function buildFundsEmbed({ groupName, pending, total }) {
+async function buildFundsEmbed({ groupName, pending, total, gameSlug }) {
     return {
         title: `${moneyBagEmoji} ${groupName} Group Funds`,
         color: COLOR_FUNDS,
@@ -47,6 +56,7 @@ async function buildFundsEmbed({ groupName, pending, total }) {
             { name: `${pendingEmoji} Pending`, value: `${robuxEmoji} **${pending.toLocaleString()}**`, inline: true },
             { name: `${bankEmoji} Total`, value: `${robuxEmoji} **${total.toLocaleString()}**`, inline: true },
         ],
+        ...gameFooter(gameSlug),
         timestamp: new Date().toISOString(),
     };
 }

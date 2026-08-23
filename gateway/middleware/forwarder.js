@@ -1,6 +1,5 @@
 module.exports = (proxy, routes) => (req, res) => {
-    // Match on a full path segment (exact, or followed by '/') so a shorter prefix like
-    // /discord can't shadow a longer one like /discord-webhook. Prefer the longest match.
+    // Get the longest match prefix to route by (e.g., /discord-webhook instead of /discord)
     const servicePath = Object.keys(routes)
         .filter(url => req.path === url || req.path.startsWith(`${url}/`))
         .sort((a, b) => b.length - a.length)[0];
@@ -23,7 +22,6 @@ module.exports = (proxy, routes) => (req, res) => {
 
         if (req.game.robloxUniverseId != null) headers['x-roblox-universe-id'] = String(req.game.robloxUniverseId);
         if (req.game.robloxOpenCloudApiKey) headers['x-roblox-open-cloud-api-key'] = req.game.robloxOpenCloudApiKey;
-        if (req.game.discordWebhookUrl) headers['x-discord-webhook-url'] = req.game.discordWebhookUrl;
     }
 
     proxy.web(req, res, { target, changeOrigin: true, timeout: 10000, headers }, (err) => {

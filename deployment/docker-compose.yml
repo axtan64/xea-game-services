@@ -72,6 +72,11 @@ services:
     restart: unless-stopped
     networks:
       - internal   # same
+    environment:
+      - TRACK_WEBHOOK_URL=${TRACK_WEBHOOK_URL}
+      - PURCHASE_WEBHOOK_URL=${PURCHASE_WEBHOOK_URL}
+      - FUNDS_WEBHOOK_URL=${FUNDS_WEBHOOK_URL}
+      - TUNNEL_WEBHOOK_URL=${TUNNEL_WEBHOOK_URL}
 
   communication:
     build: ../services/communication
