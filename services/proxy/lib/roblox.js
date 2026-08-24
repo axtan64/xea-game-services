@@ -127,32 +127,38 @@ async function getPublicGames(userId) {
 }
 
 /**
- * Given a universe, retrieve its gamepasses (up to 100)
+ * Given a universe, retrieve its for-sale gamepasses
  * @param {number} universeId ID of the universe
  * @param {string} gameName Name of the game
- * @return {{ id, name, price, universeId, gameName }[]} List of gamepasses 
+ * @return {{ id, name, price, universeId, gameName }[]} List of gamepasses
  */
 async function getGamepasses(universeId, gameName) {
-    const url = new URL(`https://games.roblox.com/v1/games/${universeId}/game-passes`);
-    url.searchParams.set('limit', String(100));
-    url.searchParams.set('sortOrder', 'Asc');
+    const passes = [];
+    let pageToken = null;
 
-    const res = await fetchWithRotation(url.toString());
+    // if it's over 10 pages then that's ridiculous. we just give up at that point
+    for (let page = 0; page < 10; page++) {
+        const url = new URL(`https://apis.roblox.com/game-passes/v1/universes/${universeId}/game-passes`);
+        url.searchParams.set('passView', 'Full');
+        url.searchParams.set('maxPageSize', '100');
+        if (pageToken) url.searchParams.set('pageToken', pageToken);
 
-    if (!res.ok)
-        throw new Error(`Roblox game-passes API responded ${res.status}`);
+        const res = await fetchWithRotation(url.toString());
 
-    const body = await res.json();
+        if (!res.ok)
+            throw new Error(`Roblox game-passes API responded ${res.status}`);
 
-    return body.data
-        .filter((pass) => typeof pass.price === 'number' && pass.price > 0)
-        .map((pass) => ({
-            id: pass.id,
-            name: pass.name,
-            price: pass.price,
-            universeId,
-            gameName,
-        }));
+        const body = await res.json();
+
+        for (const pass of body.gamePasses ?? [])
+            if (typeof pass.price === 'number' && pass.price > 0)
+                passes.push({ id: pass.id, name: pass.name, price: pass.price, universeId, gameName });
+
+        pageToken = body.nextPageToken;
+        if (!pageToken) break;
+    }
+
+    return passes;
 }
 
 /**
