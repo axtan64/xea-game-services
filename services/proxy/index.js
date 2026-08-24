@@ -8,6 +8,8 @@ const swaggerJsdoc = require('swagger-jsdoc');
 
 const app = express();
 
+app.use(express.json());
+
 const swaggerOptions = require('./swagger-options');
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
@@ -21,12 +23,14 @@ const likesRouter = require('./api/likes');
 const verifiedRouter = require('./api/verified');
 const groupsRouter = require('./api/groups');
 const robloxBadgesRouter = require('./api/roblox-badges');
+const maxClaimRouter = require('./api/max-claim');
 
 app.use('/following', followingRouter);
 app.use('/likes', likesRouter);
 app.use('/verified', verifiedRouter);
 app.use('/groups', groupsRouter);
 app.use('/roblox-badges', robloxBadgesRouter);
+app.use('/max-claim', maxClaimRouter);
 
 app.listen(PORT, () => {
     console.log(`Proxy server running on port ${PORT}`);

@@ -3,12 +3,21 @@ const { proxies, pickProxies } = require('./proxyPool');
 
 const MAX_ATTEMPTS = Math.min(3, proxies.length);
 
-// Fetches a URL through a randomly chosen proxy from the pool. If the proxy is
-// unreachable, or Roblox responds with a rate limit / server error, retries
-// through a different proxy (up to MAX_ATTEMPTS) rather than failing immediately.
+let warnedNoProxies = false;
+
+/**
+ * Fetch a URL from a randomly chosen proxy (will keep retrying w/ new ones if rate limited). 
+ * Fallback to an unproxied request if no proxies are configured.
+ */
 async function fetchWithRotation(url, options = {}) {
-    if (proxies.length === 0)
-        throw new Error('No proxies configured (set PROXIES in .env)');
+    if (proxies.length === 0) {
+        if (!warnedNoProxies) {
+            console.warn('PROXIES is not set - making requests directly with no proxy. This is fine for light/dev use, but Roblox will rate-limit a single IP under real traffic.');
+            warnedNoProxies = true;
+        }
+
+        return fetch(url, options);
+    }
 
     const candidates = pickProxies(MAX_ATTEMPTS);
     let lastError;

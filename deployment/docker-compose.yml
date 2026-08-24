@@ -53,6 +53,8 @@ services:
     restart: unless-stopped
     networks:
       - internal   # no ports: exposed publicly, internal only
+    environment:
+      - PROXIES=${PROXIES}
 
   users:
     build:
