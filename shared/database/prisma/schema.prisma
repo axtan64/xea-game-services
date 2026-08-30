@@ -69,6 +69,7 @@ model MiningPlayerStats {
     selectedLevel    Int      @default(1)
     progress         Int      @default(0)
     totalBlocksMined Int      @default(0)
+    heroIndex        Int      @default(0)
     createdAt        DateTime @default(now())
     updatedAt        DateTime @updatedAt
 }
