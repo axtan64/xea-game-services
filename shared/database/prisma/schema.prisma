@@ -71,6 +71,7 @@ model MiningPlayerStats {
     totalBlocksMined Int      @default(0)
     heroIndex        Int      @default(0)
     heroLevels       Json     @default("{}")
+    heroUpgrades     Json     @default("{}")
     lifetimeDamage   Int      @default(0)
     createdAt        DateTime @default(now())
     updatedAt        DateTime @updatedAt
