@@ -65,6 +65,8 @@ model MiningPlayerStats {
     robloxId         BigInt   @id
     level            Int      @default(1)
     gold             String   @default("0;0")
+    gems             String   @default("0;0")
+    unobtanium       String   @default("0;0")
     highestLevel     Int      @default(1)
     selectedLevel    Int      @default(1)
     progress         Int      @default(0)
@@ -73,6 +75,7 @@ model MiningPlayerStats {
     heroLevels       Json     @default("{}")
     heroUpgrades     Json     @default("{}")
     lifetimeDamage   Int      @default(0)
+    timePlayed       Int      @default(0)
     createdAt        DateTime @default(now())
     updatedAt        DateTime @updatedAt
 }
