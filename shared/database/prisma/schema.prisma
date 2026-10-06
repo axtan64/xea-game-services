@@ -76,6 +76,7 @@ model MiningPlayerStats {
     lifetimeDamage    String   @default("0;0")
     timePlayed        Int      @default(0)
     achievementLevels Json     @default("{}")
+    settings          Json     @default("{}")
     createdAt         DateTime @default(now())
     updatedAt         DateTime @updatedAt
 }
