@@ -62,23 +62,24 @@ model Purchase {
 
 // User Data for Xea's Mining Game
 model MiningPlayerStats {
-    robloxId          BigInt   @id
-    level             Int      @default(1)
-    gold              String   @default("0;0")
-    gems              String   @default("0;0")
-    unobtanium        String   @default("0;0")
-    highestLevel      Int      @default(1)
-    progress          Int      @default(0)
-    totalBlocksMined  String   @default("0;0")
-    heroIndex         Int      @default(0)
-    heroLevels        Json     @default("{}")
-    heroUpgrades      Json     @default("{}")
-    lifetimeDamage    String   @default("0;0")
-    timePlayed        Int      @default(0)
-    achievementLevels Json     @default("{}")
-    settings          Json     @default("{}")
-    createdAt         DateTime @default(now())
-    updatedAt         DateTime @updatedAt
+    robloxId            BigInt   @id
+    level               Int      @default(1)
+    gold                String   @default("0;0")
+    gems                String   @default("0;0")
+    unobtanium          String   @default("0;0")
+    highestLevel        Int      @default(1)
+    progress            Int      @default(0)
+    totalBlocksMined    String   @default("0;0")
+    heroIndex           Int      @default(0)
+    heroLevels          Json     @default("{}")
+    heroUpgrades        Json     @default("{}")
+    lifetimeDamage      String   @default("0;0")
+    timePlayed          Int      @default(0)
+    achievementLevels   Json     @default("{}")
+    settings            Json     @default("{}")
+    objectivesCompleted Int      @default(0)
+    createdAt           DateTime @default(now())
+    updatedAt           DateTime @updatedAt
 }
 
 // User Data for Xea's Donation Game
