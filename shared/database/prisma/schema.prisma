@@ -69,6 +69,7 @@ model MiningPlayerStats {
     unobtanium          String   @default("0;0")
     highestLevel        Int      @default(1)
     progress            Int      @default(0)
+    progressLevel       Int      @default(1)
     totalBlocksMined    String   @default("0;0")
     heroIndex           Int      @default(0)
     heroLevels          Json     @default("{}")
