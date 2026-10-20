@@ -79,6 +79,8 @@ model MiningPlayerStats {
     achievementLevels   Json     @default("{}")
     settings            Json     @default("{}")
     objectivesCompleted Int      @default(0)
+    mealsEaten          Int      @default(0)
+    lastMealEatenAt     Int      @default(0)
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 }
