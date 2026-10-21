@@ -109,3 +109,14 @@ model Donation {
     @@index([toRobloxId])
     @@index([fromRobloxId])
 }
+
+// A "like" from one player to another in the mining game
+model MiningLike {
+    id        String   @id @default(uuid())
+    userId    BigInt
+    likingId  BigInt
+    createdAt DateTime @default(now())
+
+    @@unique([userId, likingId])
+    @@index([likingId])
+}
