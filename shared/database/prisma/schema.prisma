@@ -81,6 +81,9 @@ model MiningPlayerStats {
     objectivesCompleted Int      @default(0)
     mealsEaten          Int      @default(0)
     lastMealEatenAt     Int      @default(0)
+    pendingUnobtanium   String   @default("0;0")
+    lifetimeUnobtanium  String   @default("0;0")
+    lifeLength          Int      @default(0)
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 }
