@@ -84,6 +84,7 @@ model MiningPlayerStats {
     pendingUnobtanium   String   @default("0;0")
     lifetimeUnobtanium  String   @default("0;0")
     lifeLength          Int      @default(0)
+    ascensionCount      Int      @default(0)
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 }
