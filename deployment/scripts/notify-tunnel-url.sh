@@ -1,6 +1,6 @@
 #!/bin/sh
 # Detects the current Cloudflare quick tunnel URL and posts a Discord embed (via the
-# discord-webhook service's /tunnel endpoint) whenever it changes.
+# discord-bot service's /tunnel endpoint) whenever it changes.
 #
 # Intended to run on a schedule (cron/systemd timer) directly on the host, independent of
 # deploys - so a tunnel restart/crash between deploys gets noticed promptly, not just whenever
@@ -29,12 +29,12 @@ fi
 # Reuse the users service's image (already built, has Node's built-in fetch) rather than adding
 # a curl dependency anywhere - same trick as the "Run database migrations" deploy step
 docker compose run --rm -T users node -e "
-fetch('http://discord-webhook:3006/tunnel', {
+fetch('http://discord-bot:3002/tunnel', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url: '$CURRENT_URL' }),
 }).then((res) => {
-    if (!res.ok) { console.error('discord-webhook responded', res.status); process.exit(1); }
+    if (!res.ok) { console.error('discord-bot responded', res.status); process.exit(1); }
 });
 "
 
