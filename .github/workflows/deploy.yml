@@ -25,7 +25,7 @@ jobs:
 
       - name: Deploy
         working-directory: /home/archie/Desktop/xea-game-services/deployment
-        run: docker compose up -d
+        run: docker compose up -d --remove-orphans
 
       - name: Show current tunnel URLs
         working-directory: /home/archie/Desktop/xea-game-services/deployment

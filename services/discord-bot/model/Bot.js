@@ -83,7 +83,8 @@ module.exports = class Bot {
         await interaction.reply({ content: `You're using commands too quick! Please try again in ${timeout.toLocaleString()} milliseconds.`, flags: MessageFlags.Ephemeral });
     }
 
-    async replyError(interaction, message) {
-        await interaction.reply({ content: message, flags: MessageFlags.Ephemeral });
+    // Build an error reply body
+    replyError(message) {
+        return { content: message, flags: MessageFlags.Ephemeral };
     }
 }

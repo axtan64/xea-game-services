@@ -65,7 +65,7 @@ bot.onInteraction(async (interaction) => {
         console.error(`Error executing command ${commandName}:`, e);
 
         // Inform the user their command could not be ran
-        const body = bot.replyError(interaction, 'An error occurred while executing the command. Please try again later.');
+        const body = bot.replyError('An error occurred while executing the command. Please try again later.');
         if (interaction.replied || interaction.deferred)
             await interaction.followUp(body);
         else

@@ -61,38 +61,40 @@ const ask = new Command(
         ),
     async (interaction) => {
         await interaction.reply({ content: 'uhhh lemme have a think about that one (loading...)' });
-        const sent = await interaction.fetchReply(); // Fetch the reference to the message just sent by the bot
 
-        const question = interaction.options.getString('question');
-
-        // Load the transformer model for feature extraction
-        const extractor = await pipeline(PIPELINE, MODEL_NAME);
-
-        // Embed the question
-        const questionEmbedding = await extractor(
-            question,
-            { pooling: "mean", normalize: true }
-        );
-
-        const questionVector = new Float32Array(questionEmbedding.data);
-
-        // Search the database for relevant memories
-        const results = db.prepare(`
-            SELECT m.*, e.embedding
-            FROM memory_embeddings e
-            JOIN memories m
-            ON m.id = e.rowid
-            WHERE e.embedding MATCH ? AND k = 5
-            ORDER BY e.distance
-        `).all(questionVector);
-
-        // Construct a response based on the retrieved memories
-        let memories = results.map(result => result.text);
-
-        const prompt = getUserPrompt(question, results);
-
-        // Generate a response using OpenAI's API
+        // Interaction already replied to here, so use editReply to indicate failure (not reply/replyError)
         try {
+            const question = interaction.options.getString('question');
+
+            // Load the transformer model for feature extraction
+            const extractor = await pipeline(PIPELINE, MODEL_NAME);
+
+            // Embed the question
+            const questionEmbedding = await extractor(
+                question,
+                { pooling: "mean", normalize: true }
+            );
+
+            const questionVector = new Float32Array(questionEmbedding.data);
+
+            // Search the database for relevant memories
+            let results = [];
+            try {
+                results = db.prepare(`
+                    SELECT m.*, e.embedding
+                    FROM memory_embeddings e
+                    JOIN memories m
+                    ON m.id = e.rowid
+                    WHERE e.embedding MATCH ? AND k = 5
+                    ORDER BY e.distance
+                `).all(questionVector);
+            } catch (err) {
+                if (err.code !== 'SQLITE_ERROR') throw err;
+            }
+
+            const prompt = getUserPrompt(question, results);
+
+            // Generate a response using Groq's API
             const groqResponse = await fetch(GROQ_API_URL, {
                 method: "POST",
                 headers: {
@@ -105,9 +107,6 @@ const ask = new Command(
                         { role: "system", content: SYSTEM_PROMPT },
                         { role: "user", content: prompt }
                     ],
-                    // gpt-oss is a reasoning model - it spends part of the token budget on an internal
-                    // "reasoning" field before the real answer, so max_tokens needs real headroom or
-                    // content comes back empty; reasoning_effort keeps that reasoning phase short
                     reasoning_effort: "low",
                     max_tokens: 400,
                 }),
@@ -129,7 +128,7 @@ const ask = new Command(
         } catch (error) {
             console.error('Error generating response:', error);
 
-            await interaction.editReply('sorry i died while trying to answer your question. please try again later.');
+            await interaction.editReply('sorry i died while trying to answer your question. please try again later.').catch(() => {});
         }
     },
     20000
