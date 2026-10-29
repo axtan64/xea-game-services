@@ -38,11 +38,14 @@ services:
       dockerfile: gateway/Dockerfile
     restart: unless-stopped
     networks:
-      - internal   # no public port - only reachable via cloudflared
+      - internal   # no *public* port - production traffic only ever reaches this via cloudflared
+    ports:
+      - "127.0.0.1:3000:3000"   # loopback-only - lets you hit /docs etc. directly for local testing without needing the quick tunnel's (randomly-changing) URL
     environment:
       - PROXY_SERVICE_URL=http://proxy:3004
       - USERS_SERVICE_URL=http://users:3005
-      - DISCORD_WEBHOOK_SERVICE_URL=http://discord-webhook:3006
+      - DISCORD_BOT_SERVICE_URL=http://discord-bot:3002
+      - ECONOMY_SERVICE_URL=http://economy:3003
       - COMMUNICATION_SERVICE_URL=http://communication:3000
       - DATABASE_URL=postgresql://mining:mining@postgres:5432/mining
     depends_on:
@@ -69,16 +72,70 @@ services:
     depends_on:
       - postgres
 
-  discord-webhook:
-    build: ../services/discord-webhook
+  economy:
+    build:
+      context: ..
+      dockerfile: services/economy/Dockerfile
+    restart: unless-stopped
+    networks:
+      - internal
+    environment:
+      - PORT=3003
+      - DATABASE_URL=postgresql://mining:mining@postgres:5432/mining
+    depends_on:
+      - postgres
+
+  discord-bot:
+    build:
+      context: ..
+      dockerfile: services/discord-bot/Dockerfile
     restart: unless-stopped
     networks:
       - internal   # same
     environment:
-      - TRACK_WEBHOOK_URL=${TRACK_WEBHOOK_URL}
-      - PURCHASE_WEBHOOK_URL=${PURCHASE_WEBHOOK_URL}
-      - FUNDS_WEBHOOK_URL=${FUNDS_WEBHOOK_URL}
-      - TUNNEL_WEBHOOK_URL=${TUNNEL_WEBHOOK_URL}
+      - PORT=3002
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - TRACK_CHANNEL_ID=1381949020007829640
+      - PURCHASE_CHANNEL_ID=1517455874569011260
+      - TUNNEL_CHANNEL_ID=1364594802850795520
+      - FUNDS_CHANNEL_ID=1565327548294893689
+      - ROBLOX_GROUP_ID=13952572
+      - ROBLOX_BOT_COOKIE=${ROBLOX_BOT_COOKIE} # seed only - once set, the dashboard's Setting row in Postgres takes over
+      - DATABASE_URL=postgresql://mining:mining@postgres:5432/mining
+      - GROQ_API_KEY=${GROQ_API_KEY} # chat-memory /ask command
+    depends_on:
+      - postgres
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: services/dashboard/Dockerfile
+    restart: unless-stopped
+    networks:
+      - internal   # not on the gateway - has its own quick tunnel below, with its own OAuth-redirect-aware notifier
+    ports:
+      - "127.0.0.1:3006:3006"   # loopback-only - lets you reach it directly without going through any tunnel (e.g. over an SSH port-forward)
+    environment:
+      - PORT=3006
+      - DATABASE_URL=postgresql://mining:mining@postgres:5432/mining
+      - ROBLOX_OAUTH_CLIENT_ID=${ROBLOX_OAUTH_CLIENT_ID}
+      - ROBLOX_OAUTH_CLIENT_SECRET=${ROBLOX_OAUTH_CLIENT_SECRET}
+      - ROBLOX_OAUTH_REDIRECT_URI=${ROBLOX_OAUTH_REDIRECT_URI}
+      - ROBLOX_ADMIN_USER_ID=${ROBLOX_ADMIN_USER_ID}
+      - DASHBOARD_SESSION_SECRET=${DASHBOARD_SESSION_SECRET}
+    depends_on:
+      - postgres
+
+  # Free Cloudflare Quick Tunnel for the dashboard, same as the gateway's `cloudflared` below
+  cloudflared-dashboard:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://dashboard:3006
+    restart: unless-stopped
+    networks:
+      - internal
+    depends_on:
+      - dashboard
 
   communication:
     build: ../services/communication

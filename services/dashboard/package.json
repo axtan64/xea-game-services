@@ -1,0 +1,27 @@
+{
+  "name": "dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Admin dashboard for the xea-game-services backend",
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"node --watch server/index.js\" \"vite --config client/vite.config.js\"",
+    "build": "vite build --config client/vite.config.js",
+    "start": "node server/index.js"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "database": "file:../../shared/database",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "vite": "^6.0.7"
+  }
+}

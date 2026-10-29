@@ -27,9 +27,12 @@ jobs:
         working-directory: /home/archie/Desktop/xea-game-services/deployment
         run: docker compose up -d
 
-      - name: Show current tunnel URL
+      - name: Show current tunnel URLs
         working-directory: /home/archie/Desktop/xea-game-services/deployment
         run: |
           sleep 5
           URL=$(docker compose logs cloudflared 2>&1 | grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' | tail -n 1)
-          echo "Current Cloudflare tunnel URL: ${URL:-not found yet - check 'docker compose logs cloudflared' on the Pi}"
+          echo "Current gateway tunnel URL: ${URL:-not found yet - check 'docker compose logs cloudflared' on the Pi}"
+          DASH_URL=$(docker compose logs cloudflared-dashboard 2>&1 | grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' | tail -n 1)
+          echo "Current dashboard tunnel URL: ${DASH_URL:-not found yet - check 'docker compose logs cloudflared-dashboard' on the Pi}"
+          echo "(ROBLOX_OAUTH_REDIRECT_URI and the Discord notification are kept in sync by the dashboard-tunnel cron job, not this workflow - see deployment/scripts/notify-dashboard-tunnel-url.sh)"

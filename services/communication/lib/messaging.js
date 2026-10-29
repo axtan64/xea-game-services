@@ -35,4 +35,11 @@ function publishAnnouncement(universeId, apiKey, userId, message) {
     return publishMessage(universeId, apiKey, TOPIC, { userId, message });
 }
 
-module.exports = { publishAnnouncement, MAX_MESSAGE_BYTES };
+// Must match Enums.GlobalMessage.ProductGranted exactly on the Roblox side
+const PRODUCT_GRANTED_TOPIC = 'PRODUCT_GRANTED';
+
+function publishProductGrant(universeId, apiKey, recipientUserId, productKey) {
+    return publishMessage(universeId, apiKey, PRODUCT_GRANTED_TOPIC, { recipientUserId, productKey });
+}
+
+module.exports = { publishAnnouncement, publishProductGrant, MAX_MESSAGE_BYTES };

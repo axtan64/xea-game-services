@@ -22,13 +22,14 @@ model Game {
 
 // A Roblox account's identity
 model User {
-    id          String            @id @default(uuid())
-    robloxId    BigInt            @unique
-    createdAt   DateTime          @default(now())
-    updatedAt   DateTime          @updatedAt
-    metadata    Json?
-    purchases   Purchase[]
-    memberships GameMembership[]
+    id                String            @id @default(uuid())
+    robloxId          BigInt            @unique
+    createdAt         DateTime          @default(now())
+    updatedAt         DateTime          @updatedAt
+    metadata          Json?
+    purchases         Purchase[]        @relation("PurchaseUser")
+    receivedPurchases Purchase[]        @relation("PurchaseRecipient")
+    memberships       GameMembership[]
 }
 
 // Per-(game, user) moderation/role state
@@ -49,15 +50,21 @@ model GameMembership {
 }
 
 model Purchase {
-    id          String   @id @default(uuid())
-    game        Game     @relation(fields: [gameId], references: [id])
-    gameId      String
-    user        User     @relation(fields: [userId], references: [id])
-    userId      String
-    productId   BigInt
-    priceRobux  Int
-    purchasedAt DateTime @default(now())
-    metadata    Json?
+    id              String   @id @default(uuid())
+    game            Game     @relation(fields: [gameId], references: [id])
+    gameId          String
+    user            User     @relation("PurchaseUser", fields: [userId], references: [id])
+    userId          String
+    recipient       User?    @relation("PurchaseRecipient", fields: [recipientId], references: [id])
+    recipientId     String?
+    productId       BigInt
+    productType     String   @default("devproduct") // 'gamepass' | 'devproduct'
+    priceRobux      Int
+    robloxReceiptId String?  @unique // Roblox ProcessReceipt's PurchaseId - idempotency key; null for non-receipted (e.g. admin) grants
+    purchasedAt     DateTime @default(now())
+    metadata        Json?
+
+    @@index([recipientId])
 }
 
 // User Data for Xea's Mining Game
@@ -85,6 +92,9 @@ model MiningPlayerStats {
     lifetimeUnobtanium  String   @default("0;0")
     lifeLength          Int      @default(0)
     ascensionCount      Int      @default(0)
+    levelToken          Int      @default(0)
+    boardUpgrades       Json     @default("{}")
+    ownedProducts       Json     @default("{}")
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 }
@@ -112,6 +122,16 @@ model Donation {
 
     @@index([toRobloxId])
     @@index([fromRobloxId])
+}
+
+// Live-rotatable key/value config (e.g. ROBLOX_BOT_COOKIE), edited via the admin dashboard
+// without a redeploy/restart. Value is stored as plain text - callers are responsible for
+// treating sensitive values as secrets (never logged, never returned unmasked to a UI that
+// doesn't need the raw value).
+model Setting {
+    key       String   @id
+    value     String
+    updatedAt DateTime @updatedAt
 }
 
 // A "like" from one player to another in the mining game

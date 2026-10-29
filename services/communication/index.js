@@ -19,8 +19,10 @@ app.use('/docs.json', (req, res) => res.json(swaggerSpec)); // For gateway docum
 
 // Routes
 const announceRouter = require('./api/announce');
+const productGrantRouter = require('./api/productGrant');
 
 app.use('/announce', announceRouter);
+app.use('/product-grant', productGrantRouter);
 
 app.listen(PORT, () => {
     console.log(`Communication server running on port ${PORT}`);
