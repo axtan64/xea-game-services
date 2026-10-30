@@ -1,12 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
 
-export default function Shell({ userId, children }) {
+export default function Shell({ profile, children }) {
     const location = useLocation();
 
     async function signOut() {
         await fetch('/auth/logout', { method: 'POST' });
         window.location.reload();
     }
+
+    const { name, username, picture, rank, userId } = profile ?? {};
 
     return (
         <div className="app">
@@ -16,8 +18,21 @@ export default function Shell({ userId, children }) {
                     <span className="brand-name">XeaDev</span>
                 </div>
                 <div className="status">
-                    <span className="dot green" />
-                    {userId}
+                    <div className="account">
+                        {picture ? (
+                            <img className="account-avatar" src={picture} alt="" />
+                        ) : (
+                            <div className="account-avatar account-avatar-fallback">{(name || username || '?')[0]}</div>
+                        )}
+                        <div className="account-info">
+                            <span className="account-name">{name || userId}</span>
+                            <span className="account-sub">
+                                {username ? `@${username}` : null}
+                                {username && rank ? ' · ' : null}
+                                {rank}
+                            </span>
+                        </div>
+                    </div>
                     <button className="link-btn" onClick={signOut}>Sign out</button>
                 </div>
             </div>

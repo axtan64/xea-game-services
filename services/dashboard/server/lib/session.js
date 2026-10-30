@@ -30,8 +30,8 @@ function verify(token, secret) {
     }
 }
 
-function createSessionCookieValue(userId, secret) {
-    return sign({ userId, exp: Date.now() + MAX_AGE_MS }, secret);
+function createSessionCookieValue(profile, secret) {
+    return sign({ ...profile, exp: Date.now() + MAX_AGE_MS }, secret);
 }
 
 module.exports = { COOKIE_NAME, MAX_AGE_MS, createSessionCookieValue, verify };

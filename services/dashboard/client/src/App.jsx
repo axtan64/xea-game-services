@@ -26,7 +26,7 @@ export default function App() {
     }
 
     return (
-        <Shell userId={me.userId}>
+        <Shell profile={me}>
             <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/settings" element={<Settings />} />

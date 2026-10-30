@@ -2,6 +2,7 @@ const { Router } = require('express');
 const crypto = require('crypto');
 const { generatePkcePair, buildAuthorizeUrl, exchangeCodeForToken, fetchUserInfo } = require('../lib/robloxOAuth');
 const { COOKIE_NAME, MAX_AGE_MS, createSessionCookieValue, verify } = require('../lib/session');
+const { isAdmin, getAdminRank } = require('../lib/admins');
 
 const authRouter = Router();
 
@@ -54,10 +55,18 @@ authRouter.get('/callback', async (req, res) => {
 
         const userInfo = await fetchUserInfo(token.access_token);
 
-        if (String(userInfo.sub) !== String(process.env.ROBLOX_ADMIN_USER_ID))
+        if (!isAdmin(userInfo.sub))
             return res.status(403).send('This Roblox account is not permitted to access this dashboard.');
 
-        const cookieValue = createSessionCookieValue(userInfo.sub, process.env.DASHBOARD_SESSION_SECRET);
+        const profile = {
+            userId: userInfo.sub,
+            name: userInfo.name ?? userInfo.preferred_username,
+            username: userInfo.preferred_username,
+            picture: userInfo.picture ?? null,
+            rank: getAdminRank(userInfo.sub),
+        };
+
+        const cookieValue = createSessionCookieValue(profile, process.env.DASHBOARD_SESSION_SECRET);
         res.cookie(COOKIE_NAME, cookieValue, {
             httpOnly: true,
             secure: true,
@@ -79,7 +88,15 @@ authRouter.post('/logout', (req, res) => {
 
 authRouter.get('/me', (req, res) => {
     const session = verify(req.cookies?.[COOKIE_NAME], process.env.DASHBOARD_SESSION_SECRET);
-    res.json({ authenticated: Boolean(session), userId: session?.userId ?? null });
+
+    res.json({
+        authenticated: Boolean(session),
+        userId: session?.userId ?? null,
+        name: session?.name ?? null,
+        username: session?.username ?? null,
+        picture: session?.picture ?? null,
+        rank: session?.rank ?? null,
+    });
 });
 
 module.exports = authRouter;

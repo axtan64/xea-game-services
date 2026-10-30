@@ -95,6 +95,7 @@ model MiningPlayerStats {
     levelToken          Int      @default(0)
     boardUpgrades       Json     @default("{}")
     ownedProducts       Json     @default("{}")
+    upgradeTree         Json     @default("{}")
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 }
