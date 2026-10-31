@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { generatePkcePair, buildAuthorizeUrl, exchangeCodeForToken, fetchUserInfo } = require('../lib/robloxOAuth');
 const { COOKIE_NAME, MAX_AGE_MS, createSessionCookieValue, verify } = require('../lib/session');
 const { isAdmin, getAdminRank } = require('../lib/admins');
+const { getRobloxProfile } = require('../lib/robloxProfile');
 
 const authRouter = Router();
 
@@ -58,11 +59,15 @@ authRouter.get('/callback', async (req, res) => {
         if (!isAdmin(userInfo.sub))
             return res.status(403).send('This Roblox account is not permitted to access this dashboard.');
 
+        // Don't trust the OIDC profile claims (picture/name/preferred_username can come back null) -
+        // resolve the display profile via Roblox's public Users/Thumbnails APIs instead.
+        const robloxProfile = await getRobloxProfile(userInfo.sub);
+
         const profile = {
             userId: userInfo.sub,
-            name: userInfo.name ?? userInfo.preferred_username,
-            username: userInfo.preferred_username,
-            picture: userInfo.picture ?? null,
+            name: robloxProfile.name ?? userInfo.name ?? userInfo.preferred_username,
+            username: robloxProfile.username ?? userInfo.preferred_username,
+            picture: robloxProfile.picture,
             rank: getAdminRank(userInfo.sub),
         };
 
