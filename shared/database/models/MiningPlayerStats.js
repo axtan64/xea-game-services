@@ -1,6 +1,6 @@
 const { createPlayerStatsModel } = require('./typedStats');
 
-const STAT_FIELDS = ['level', 'gold', 'gems', 'unobtanium', 'highestLevel', 'progress', 'progressLevel', 'totalBlocksMined', 'heroIndex', 'heroLevels', 'heroUpgrades', 'lifetimeDamage', 'timePlayed', 'achievementLevels', 'settings', 'objectivesCompleted', 'mealsEaten', 'lastMealEatenAt', 'pendingUnobtanium', 'lifetimeUnobtanium', 'lifeLength', 'ascensionCount', 'levelToken', 'boardUpgrades', 'ownedProducts', 'upgradeTree', 'unlockedAreas'];
+const STAT_FIELDS = ['level', 'gold', 'gems', 'unobtanium', 'highestLevel', 'progress', 'progressLevel', 'totalBlocksMined', 'heroIndex', 'heroLevels', 'heroUpgrades', 'lifetimeDamage', 'timePlayed', 'achievementLevels', 'settings', 'objectivesCompleted', 'mealsEaten', 'lastMealEatenAt', 'pendingUnobtanium', 'lifetimeUnobtanium', 'lifeLength', 'ascensionCount', 'levelToken', 'boardUpgrades', 'ownedProducts', 'upgradeTree', 'unlockedAreas', 'hasVisitedMiningArea', 'seenTutorials'];
 const MiningPlayerStats = createPlayerStatsModel('miningPlayerStats', STAT_FIELDS);
 
 module.exports = { MiningPlayerStats, STAT_FIELDS };

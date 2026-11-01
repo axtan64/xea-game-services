@@ -96,8 +96,10 @@ model MiningPlayerStats {
     boardUpgrades       Json     @default("{}")
     ownedProducts       Json     @default("{}")
     upgradeTree         Json     @default("{}")
-    unlockedAreas       Json     @default("{}")
-    createdAt           DateTime @default(now())
+    unlockedAreas        Json     @default("{}")
+    hasVisitedMiningArea Boolean  @default(false)
+    seenTutorials        Json     @default("{}")
+    createdAt            DateTime @default(now())
     updatedAt           DateTime @updatedAt
 }
 
