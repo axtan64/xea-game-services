@@ -27,6 +27,12 @@ jobs:
         working-directory: /home/archie/Desktop/xea-game-services/deployment
         run: docker compose up -d --remove-orphans
 
+      - name: Clean up superseded images/cache
+        working-directory: /home/archie/Desktop/xea-game-services/deployment
+        run: |
+          docker image prune -f
+          docker builder prune -f --filter until=168h
+
       - name: Show current tunnel URLs
         working-directory: /home/archie/Desktop/xea-game-services/deployment
         run: |
