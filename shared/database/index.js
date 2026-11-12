@@ -6,6 +6,7 @@ const GameMembership = require('./models/GameMembership');
 const { UnknownStatFieldError } = require('./models/typedStats');
 const { MiningPlayerStats, STAT_FIELDS: MINING_STAT_FIELDS } = require('./models/MiningPlayerStats');
 const { DonationPlayerStats, STAT_FIELDS: DONATION_STAT_FIELDS } = require('./models/DonationPlayerStats');
+const { CutcPlayerStats, STAT_FIELDS: CUTC_STAT_FIELDS } = require('./models/CutcPlayerStats');
 const Donation = require('./models/Donation');
 const MiningLike = require('./models/MiningLike');
 const Setting = require('./models/Setting');
@@ -14,6 +15,7 @@ const Setting = require('./models/Setting');
 const STATS_MODELS_BY_SLUG = {
     mining: { Model: MiningPlayerStats, fields: MINING_STAT_FIELDS },
     donation: { Model: DonationPlayerStats, fields: DONATION_STAT_FIELDS },
+    cutc: { Model: CutcPlayerStats, fields: CUTC_STAT_FIELDS },
 };
 
 module.exports = {
@@ -26,6 +28,8 @@ module.exports = {
     MINING_STAT_FIELDS,
     DonationPlayerStats,
     DONATION_STAT_FIELDS,
+    CutcPlayerStats,
+    CUTC_STAT_FIELDS,
     Donation,
     MiningLike,
     Setting,

@@ -117,6 +117,16 @@ model DonationPlayerStats {
     updatedAt      DateTime @updatedAt
 }
 
+// User Data for Clean Up The City (slug: cutc)
+model CutcPlayerStats {
+    robloxId      BigInt   @id
+    timePlayed    Int      @default(0)
+    settings      Json     @default("{}")
+    ownedProducts Json     @default("{}")
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+}
+
 // Permanent ledger of Robux donations between players in the donation game
 model Donation {
     id           String    @id @default(uuid())
