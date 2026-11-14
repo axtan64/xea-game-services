@@ -120,11 +120,22 @@ model DonationPlayerStats {
 // User Data for Clean Up The City (slug: cutc)
 model CutcPlayerStats {
     robloxId      BigInt   @id
-    timePlayed    Int      @default(0)
-    settings      Json     @default("{}")
-    ownedProducts Json     @default("{}")
-    createdAt     DateTime @default(now())
-    updatedAt     DateTime @updatedAt
+    timePlayed     Int      @default(0)
+    settings       Json     @default("{}")
+    ownedProducts  Json     @default("{}")
+    // Per account until save slots exist; the brief moves cash into the leader's save slot later
+    cash           Float    @default(0)
+    contractTokens Int      @default(0)
+    // { [litterItemId]: true }
+    litterIndex    Json     @default("{}")
+    // { [classId]: count }
+    classes        Json     @default("{}")
+    // "" when none is equipped
+    equippedClass  String   @default("")
+    // Shop upgrade levels, { [upgradeId]: level }; per account until save slots exist, like cash
+    upgrades       Json     @default("{}")
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
 }
 
 // Permanent ledger of Robux donations between players in the donation game

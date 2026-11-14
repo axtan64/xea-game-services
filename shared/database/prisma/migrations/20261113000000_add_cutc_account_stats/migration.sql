@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "CutcPlayerStats" ADD COLUMN     "cash" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "classes" JSONB NOT NULL DEFAULT '{}',
+ADD COLUMN     "contractTokens" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "equippedClass" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "litterIndex" JSONB NOT NULL DEFAULT '{}';
