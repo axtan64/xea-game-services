@@ -18,7 +18,7 @@ Outside of the services, `shared/` holds packages installed across multiple serv
 - `logger/` - Logs to console and files, with different log levels
 - `database/` - Initialises a Prisma/Postgres connection and performs queries
 
-**Multi-tenant:** each game gets its own `Game` row (own gateway token, Roblox universe/Open Cloud key, Discord webhook) instead of sharing one set of env vars. The gateway resolves the caller's token to a game and forwards its config downstream as headers. Onboard a new game with `npm run create-game -- <slug> <name>` from `shared/database`.
+**Multi-tenant:** each game gets its own `Game` row (own gateway token, Roblox universe/Open Cloud key, Discord webhook) instead of sharing one set of env vars. The gateway resolves the caller's token to a game and forwards its config downstream as headers. To onboard a new game, follow the step-by-step guide in [`deployment/README.md`](deployment/README.md#onboarding-a-new-game). The scripts run inside the `users` container on the Pi, not on the host.
 
 ## Deployment
 

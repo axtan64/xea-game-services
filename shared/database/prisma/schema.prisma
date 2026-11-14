@@ -132,8 +132,6 @@ model CutcPlayerStats {
     classes        Json     @default("{}")
     // "" when none is equipped
     equippedClass  String   @default("")
-    // Shop upgrade levels, { [upgradeId]: level }; per account until save slots exist, like cash
-    upgrades       Json     @default("{}")
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 }
