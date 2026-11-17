@@ -15,6 +15,23 @@ jobs:
           git fetch origin
           git reset --hard origin/main
 
+      # The Pi's disk is small, and a build needs room for the new images while the old ones are still running.
+      # Clear what earlier deploys left behind first, then refuse to start a build that can't fit: running out
+      # mid-build takes the runner's own log down with it, and leaves half-unpacked images behind.
+      - name: Free disk space before building
+        env:
+          MIN_FREE_GB: 4
+        run: |
+          docker image prune -f
+          docker builder prune -f --filter until=24h
+          ROOT=$(docker info --format '{{.DockerRootDir}}')
+          df -h "$ROOT"
+          FREE_GB=$(df --output=avail -BG "$ROOT" | tail -n 1 | tr -dc '0-9')
+          if [ "$FREE_GB" -lt "$MIN_FREE_GB" ]; then
+            echo "::error::Only ${FREE_GB}G free where Docker keeps its images; a deploy needs ${MIN_FREE_GB}G. Free some space on the Pi and re-run."
+            exit 1
+          fi
+
       - name: Build images
         working-directory: /home/archie/Desktop/xea-game-services/deployment
         run: docker compose build
@@ -27,11 +44,16 @@ jobs:
         working-directory: /home/archie/Desktop/xea-game-services/deployment
         run: docker compose up -d --remove-orphans
 
+      # Runs even when an earlier step failed, so a broken deploy doesn't leave its images and cache for the next
+      # one to trip over. Cache from the last day is kept, so a quick re-deploy still builds fast; a week (as it
+      # was) kept every build's cache whenever deploys were days apart, which is what filled the disk.
       - name: Clean up superseded images/cache
+        if: always()
         working-directory: /home/archie/Desktop/xea-game-services/deployment
         run: |
           docker image prune -f
-          docker builder prune -f --filter until=168h
+          docker builder prune -f --filter until=24h
+          df -h "$(docker info --format '{{.DockerRootDir}}')"
 
       - name: Show current tunnel URLs
         working-directory: /home/archie/Desktop/xea-game-services/deployment
