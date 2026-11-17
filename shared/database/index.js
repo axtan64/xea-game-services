@@ -7,6 +7,9 @@ const { UnknownStatFieldError } = require('./models/typedStats');
 const { MiningPlayerStats, STAT_FIELDS: MINING_STAT_FIELDS } = require('./models/MiningPlayerStats');
 const { DonationPlayerStats, STAT_FIELDS: DONATION_STAT_FIELDS } = require('./models/DonationPlayerStats');
 const { CutcPlayerStats, STAT_FIELDS: CUTC_STAT_FIELDS } = require('./models/CutcPlayerStats');
+const CutcSaveSlot = require('./models/CutcSaveSlot');
+const CutcParty = require('./models/CutcParty');
+const CutcSlotAccess = require('./models/CutcSlotAccess');
 const Donation = require('./models/Donation');
 const MiningLike = require('./models/MiningLike');
 const Setting = require('./models/Setting');
@@ -30,6 +33,9 @@ module.exports = {
     DONATION_STAT_FIELDS,
     CutcPlayerStats,
     CUTC_STAT_FIELDS,
+    CutcSaveSlot,
+    CutcParty,
+    CutcSlotAccess,
     Donation,
     MiningLike,
     Setting,

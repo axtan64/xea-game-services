@@ -8,6 +8,7 @@ const swaggerJsdoc = require('swagger-jsdoc');
 
 const app = express();
 
+app.use('/slots', express.json({ limit: '4mb' }));
 app.use(express.json());
 
 const swaggerOptions = require('./swagger-options');
@@ -23,10 +24,14 @@ const gameContext = require('./middleware/gameContext');
 const userRouter = require('./api/user');
 const giftsRouter = require('./api/gifts');
 const likesRouter = require('./api/likes');
+const slotsRouter = require('./api/slots');
+const partiesRouter = require('./api/parties');
 
 app.use(gameContext);
 app.use('/gifts', giftsRouter); // mounted before '/' - userRouter's /:userId would otherwise swallow it
 app.use('/likes', likesRouter); // mounted before '/' - userRouter's /:userId would otherwise swallow it
+app.use('/slots', slotsRouter); // likewise
+app.use('/parties', partiesRouter); // likewise
 app.use('/', userRouter);
 
 app.listen(PORT, () => {

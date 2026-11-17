@@ -136,6 +136,72 @@ model CutcPlayerStats {
     updatedAt      DateTime @updatedAt
 }
 
+// One of a player's save slots in Clean Up The City: a whole city, played by one game server at a time
+model CutcSaveSlot {
+    id           String    @id @default(uuid())
+    ownerId      BigInt
+    // 1 to 3
+    slot         Int
+    // The save the game's SaveCodec reads and writes, opaque here; null until the first save
+    data         Json?
+    // Counts saves, so a backup copy can be told from a newer one
+    version      Int       @default(0)
+    // A summary for the lobby's slot picker, written with each save
+    cleanShare   Float     @default(0)
+    cash         Float     @default(0)
+    partySize    Int       @default(1)
+    lastPlayedAt DateTime?
+    // The session lock: the server playing the slot, and when it last said so (saves and heartbeats refresh it)
+    lockId       String?
+    lockedAt     DateTime?
+    // The live session, written by the server that holds the lock: its reserved server's ID and the access code
+    // the lobby reserved it with (copied from its CutcParty), so others can be sent into a city already in play;
+    // and who is in it, refreshed with each save and heartbeat
+    serverId     String?
+    accessCode   String?
+    playerCount  Int       @default(0)
+    ownerPresent Boolean   @default(false)
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+
+    @@unique([ownerId, slot])
+}
+
+// Who may join a Clean Up The City save slot besides its owner. Kept apart from CutcSaveSlot so wiping a slot
+// keeps its sharing, and so a slot can be set up before it is ever played
+model CutcSlotAccess {
+    id         String   @id @default(uuid())
+    ownerId    BigInt
+    slot       Int
+    // Nobody, Invited (its members) or Friends (the owner's Roblox friends, and its members)
+    access     String   @default("Friends")
+    // Whether they may play the city while its owner isn't in it
+    allowAway  Boolean  @default(false)
+    // Entering this makes a player a member; null until the owner asks for one
+    inviteCode String?  @unique
+    // Roblox user IDs, as strings
+    members    Json     @default("[]")
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+
+    @@unique([ownerId, slot])
+}
+
+// A party on its way from Clean Up The City's lobby to the reserved server that will play a save slot
+model CutcParty {
+    // The reserved server's ID (game.PrivateServerId)
+    serverId  String   @id
+    ownerId   BigInt
+    slot      Int
+    // Roblox user IDs allowed in, the owner included
+    members    Json     @default("[]")
+    // The code the lobby reserved the server with: what a later teleport into it needs
+    accessCode String?
+    createdAt  DateTime @default(now())
+
+    @@index([ownerId, slot])
+}
+
 // Permanent ledger of Robux donations between players in the donation game
 model Donation {
     id           String    @id @default(uuid())
