@@ -126,12 +126,14 @@ model CutcPlayerStats {
     // Per account until save slots exist; the brief moves cash into the leader's save slot later
     cash           Float    @default(0)
     contractTokens Int      @default(0)
-    // { [litterItemId]: true }
+    // Unused since 2026-11-18: the litter index is the save slot's, shared by its players
     litterIndex    Json     @default("{}")
     // { [classId]: count }
     classes        Json     @default("{}")
     // "" when none is equipped
     equippedClass  String   @default("")
+    // Easter eggs found, kept for good across cities: { [eggId]: true }
+    easterEggs     Json     @default("{}")
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 }
