@@ -236,7 +236,7 @@ slotsRouter.post('/:ownerId/:slot/heartbeat', async (req, res) => {
  * /slots/{ownerId}/{slot}/lock:
  *   delete:
  *     summary: Release a slot's lock
- *     description: Safe to repeat - releasing a lock that is already gone (or was taken over) answers `released: false`, not an error.
+ *     description: "Safe to repeat - releasing a lock that is already gone (or was taken over) answers `released: false`, not an error."
  *     tags: [Slots]
  *     parameters:
  *       - { in: path, name: ownerId, required: true, schema: { type: string } }

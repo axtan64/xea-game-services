@@ -236,3 +236,15 @@ model MiningLike {
     @@unique([userId, likingId])
     @@index([likingId])
 }
+
+// A "like" from one player to another in Clean Up The City (the player card's Like Player), apart from the
+// mining game's
+model CutcLike {
+    id        String   @id @default(uuid())
+    userId    BigInt
+    likingId  BigInt
+    createdAt DateTime @default(now())
+
+    @@unique([userId, likingId])
+    @@index([likingId])
+}

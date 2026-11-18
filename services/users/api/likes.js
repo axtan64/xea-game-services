@@ -1,12 +1,13 @@
 const { Router } = require('express');
-const { MiningLike } = require('database');
+const { LIKE_MODELS_BY_SLUG } = require('database');
 
 const likesRouter = Router();
 const MAX_LIKERS_PAGE_SIZE = 100;
 
-// Filter out non-mining games - likes are a mining-game-specific, purely cosmetic mechanic
+// Likes are a purely cosmetic mechanic, kept per game (LIKE_MODELS_BY_SLUG); other games get a 404
 likesRouter.use((req, res, next) => {
-    if (req.gameSlug !== 'mining')
+    req.likes = LIKE_MODELS_BY_SLUG[req.gameSlug];
+    if (!req.likes)
         return res.status(404).json({ error: 'Not found' });
 
     next();
@@ -48,7 +49,7 @@ likesRouter.use((req, res, next) => {
  *                 count: { type: number }
  */
 likesRouter.get('/:userId/count', async (req, res) => {
-    const count = await MiningLike.countFor(req.params.userId);
+    const count = await req.likes.countFor(req.params.userId);
     res.json({ count });
 });
 
@@ -80,7 +81,7 @@ likesRouter.get('/:userId/count', async (req, res) => {
  *                 liked: { type: boolean }
  */
 likesRouter.get('/:userId/:likingId', async (req, res) => {
-    const liked = await MiningLike.hasLiked(req.params.userId, req.params.likingId);
+    const liked = await req.likes.hasLiked(req.params.userId, req.params.likingId);
     res.json({ liked });
 });
 
@@ -131,7 +132,7 @@ likesRouter.post('/:userId/likers', async (req, res) => {
     if (!Number.isInteger(page) || page < 1)
         return res.status(400).json({ error: 'page must be a positive integer' });
 
-    const likes = await MiningLike.listLikers(req.params.userId, { page, pageSize });
+    const likes = await req.likes.listLikers(req.params.userId, { page, pageSize });
     res.json({ page, pageSize, likes });
 });
 
@@ -161,7 +162,7 @@ likesRouter.post('/:userId/likers', async (req, res) => {
  *             schema: { $ref: '#/components/schemas/Like' }
  */
 likesRouter.post('/:userId/:likingId', async (req, res) => {
-    const like = await MiningLike.create(req.params.userId, req.params.likingId);
+    const like = await req.likes.create(req.params.userId, req.params.likingId);
     res.json(like);
 });
 
@@ -190,7 +191,7 @@ likesRouter.post('/:userId/:likingId', async (req, res) => {
  */
 likesRouter.delete('/:userId/:likingId', async (req, res) => {
     try {
-        const like = await MiningLike.remove(req.params.userId, req.params.likingId);
+        const like = await req.likes.remove(req.params.userId, req.params.likingId);
         res.json(like);
     } catch (err) {
         if (err.code === 'P2025')
