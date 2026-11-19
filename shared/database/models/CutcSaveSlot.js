@@ -8,21 +8,26 @@ const SUMMARY = {
     cleanShare: true,
     cash: true,
     partySize: true,
+    playTime: true,
     lastPlayedAt: true,
     lockId: true,
     lockedAt: true,
     serverId: true,
     accessCode: true,
     playerCount: true,
+    maxPlayers: true,
     ownerPresent: true,
     createdAt: true,
     updatedAt: true,
 };
 
 // The summary fields a save may carry, and the type each must be
-const SUMMARY_FIELDS = { cleanShare: 'number', cash: 'number', partySize: 'number' };
+const SUMMARY_FIELDS = { cleanShare: 'number', cash: 'number', partySize: 'number', playTime: 'number' };
 
 const key = (ownerId, slot) => ({ ownerId: BigInt(ownerId), slot });
+
+// The most players any city holds, whatever its server says (the game's 100-player pass; Roblox's own limit)
+const MOST_PLAYERS = 100;
 
 // A lock nobody has refreshed for `staleMs` no longer holds: its server crashed or was shut without saving
 const staleBefore = (staleMs) => new Date(Date.now() - staleMs);
@@ -32,6 +37,8 @@ function readPresence(presence) {
     const fields = {};
 
     if (Number.isInteger(presence?.playerCount) && presence.playerCount >= 0) fields.playerCount = presence.playerCount;
+    if (Number.isInteger(presence?.maxPlayers) && presence.maxPlayers >= 1 && presence.maxPlayers <= MOST_PLAYERS)
+        fields.maxPlayers = presence.maxPlayers;
     if (typeof presence?.ownerPresent === 'boolean') fields.ownerPresent = presence.ownerPresent;
 
     return fields;

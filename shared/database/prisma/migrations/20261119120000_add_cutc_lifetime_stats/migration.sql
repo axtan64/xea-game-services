@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "CutcPlayerStats" ADD COLUMN     "cashEarned" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "litterPickedUp" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "tilesCleaned" INTEGER NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "CutcSaveSlot" ADD COLUMN     "playTime" INTEGER NOT NULL DEFAULT 0;

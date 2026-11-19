@@ -134,6 +134,12 @@ model CutcPlayerStats {
     equippedClass  String   @default("")
     // Easter eggs found, kept for good across cities: { [eggId]: true }
     easterEggs     Json     @default("{}")
+    // Ever, in every city: litter picked up, tiles whose last piece the player took, and dollars their selling earned
+    litterPickedUp Int      @default(0)
+    tilesCleaned   Int      @default(0)
+    cashEarned     Float    @default(0)
+    // The cosmetics worn: { [slot]: cosmeticId }
+    cosmetics      Json     @default("{}")
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 }
@@ -152,16 +158,20 @@ model CutcSaveSlot {
     cleanShare   Float     @default(0)
     cash         Float     @default(0)
     partySize    Int       @default(1)
+    // Seconds the city has been played, counted while anyone is in it
+    playTime     Int       @default(0)
     lastPlayedAt DateTime?
     // The session lock: the server playing the slot, and when it last said so (saves and heartbeats refresh it)
     lockId       String?
     lockedAt     DateTime?
     // The live session, written by the server that holds the lock: its reserved server's ID and the access code
     // the lobby reserved it with (copied from its CutcParty), so others can be sent into a city already in play;
-    // and who is in it, refreshed with each save and heartbeat
+    // and who is in it, refreshed with each save and heartbeat, with the most it may hold (more with the owner's
+    // 100-player pass)
     serverId     String?
     accessCode   String?
     playerCount  Int       @default(0)
+    maxPlayers   Int       @default(8)
     ownerPresent Boolean   @default(false)
     createdAt    DateTime  @default(now())
     updatedAt    DateTime  @updatedAt

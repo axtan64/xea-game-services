@@ -12,7 +12,9 @@ const MAX_LOCK_ID_LENGTH = 64;
 const MAX_ACCESS_CODE_LENGTH = 256;
 const MAX_CODE_LENGTH = 64;
 // The most players a city holds, and the most friends a listing may name
+// The most players a city holds unless its server says otherwise (CutcSaveSlot.maxPlayers), and the most any party may be
 const MAX_PLAYERS = 8;
+const MOST_PLAYERS = 100;
 const MAX_FRIENDS = 1000;
 // A party that set off this recently may not have reached its server yet, so the city counts as opening
 const LAUNCH_WINDOW_MS = 90 * 1000;
@@ -80,6 +82,7 @@ const readPresence = (req) => (typeof req.body?.presence === 'object' && req.bod
  *         cleanShare: { type: number, description: 0 to 1 }
  *         cash: { type: number }
  *         partySize: { type: integer }
+ *         playTime: { type: integer, description: Seconds the city has been played }
  *         lastPlayedAt: { type: string, nullable: true }
  *         lockId: { type: string, nullable: true }
  *         lockedAt: { type: string, nullable: true }
@@ -307,7 +310,7 @@ function judge(access, slot, userId, isFriend) {
     if (!isInvited && !(access.access === 'Friends' && isFriend)) return { allowed: false, live, reason: 'NotInvited' };
     if (!live && !(slot != null && slot.version > 0)) return { allowed: false, live, reason: 'NotStarted' };
     if (!access.allowAway && !(live && slot.ownerPresent)) return { allowed: false, live, reason: 'OwnerAway' };
-    if (live && slot.playerCount >= MAX_PLAYERS) return { allowed: false, live, reason: 'Full' };
+    if (live && slot.playerCount >= (slot.maxPlayers ?? MAX_PLAYERS)) return { allowed: false, live, reason: 'Full' };
 
     return { allowed: true, live };
 }
@@ -387,6 +390,7 @@ slotsRouter.post('/joinable', async (req, res) => {
             lastPlayedAt: slot.lastPlayedAt,
             isLive: verdict.live,
             playerCount: verdict.live ? slot.playerCount : 0,
+            maxPlayers: slot.maxPlayers ?? MAX_PLAYERS,
             ownerPresent: verdict.live && slot.ownerPresent,
             canEnter: verdict.allowed,
             reason: verdict.reason ?? null,
@@ -574,8 +578,8 @@ slotsRouter.post('/:ownerId/:slot/enter', async (req, res) => {
 
     const travellers = members ?? [userId];
 
-    if (!Array.isArray(travellers) || travellers.length === 0 || travellers.length > MAX_PLAYERS || !travellers.every(isRobloxId))
-        return res.status(400).json({ error: `members must be 1 to ${MAX_PLAYERS} Roblox user IDs` });
+    if (!Array.isArray(travellers) || travellers.length === 0 || travellers.length > MOST_PLAYERS || !travellers.every(isRobloxId))
+        return res.status(400).json({ error: `members must be 1 to ${MOST_PLAYERS} Roblox user IDs` });
 
     const isCandidate = candidate != null;
 
