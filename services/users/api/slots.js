@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { CutcSaveSlot, CutcSlotAccess, CutcParty } = require('database');
+const { CutcSaveSlot, CutcSlotAccess, CutcParty, CutcPlayerStats } = require('database');
 
 const slotsRouter = Router();
 
@@ -18,6 +18,10 @@ const MOST_PLAYERS = 100;
 const MAX_FRIENDS = 1000;
 // A party that set off this recently may not have reached its server yet, so the city counts as opening
 const LAUNCH_WINDOW_MS = 90 * 1000;
+// How many places each of the lobby's leaderboards shows, unless it asks for fewer
+const LEADERBOARD_SIZE = 10;
+// The most players one ask for ranks may name (a lobby server's players, in batches)
+const MAX_RANKED_USERS = 50;
 
 const isRobloxId = (value) => Number.isSafeInteger(value) && value > 0;
 const isShortString = (value, max) => typeof value === 'string' && value.length > 0 && value.length <= max;
@@ -83,11 +87,85 @@ const readPresence = (req) => (typeof req.body?.presence === 'object' && req.bod
  *         cash: { type: number }
  *         partySize: { type: integer }
  *         playTime: { type: integer, description: Seconds the city has been played }
+ *         finishedIn: { type: integer, nullable: true, description: The play time at which it met its last milestone }
  *         lastPlayedAt: { type: string, nullable: true }
  *         lockId: { type: string, nullable: true }
  *         lockedAt: { type: string, nullable: true }
  *         isLocked: { type: boolean, description: Whether a server holds a live lock }
  */
+
+/**
+ * @swagger
+ * /slots/leaderboards:
+ *   get:
+ *     summary: The lobby's leaderboards
+ *     description: The cleanest cities (by clean share), the fastest to meet every Depot milestone (by play time), and the players who have cleaned the most tiles. Each city board shows one city per owner. Declared before /slots/{ownerId}, which would take the path otherwise.
+ *     tags: [Slots]
+ *     parameters:
+ *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 10 }, description: Places on each board }
+ *     responses:
+ *       200:
+ *         description: The boards, best first
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 cleanest: { type: array, items: { type: object, properties: { ownerId: { type: string }, slot: { type: integer }, cleanShare: { type: number }, playTime: { type: integer } } } }
+ *                 fastest: { type: array, items: { type: object, properties: { ownerId: { type: string }, slot: { type: integer }, finishedIn: { type: integer } } } }
+ *                 cleaners: { type: array, items: { type: object, properties: { robloxId: { type: string }, tilesCleaned: { type: integer } } } }
+ */
+slotsRouter.get('/leaderboards', async (req, res) => {
+    const asked = Number(req.query.limit ?? LEADERBOARD_SIZE);
+    const limit = Number.isInteger(asked) ? Math.min(Math.max(asked, 1), LEADERBOARD_SIZE) : LEADERBOARD_SIZE;
+
+    const [cleanest, fastest, cleaners] = await Promise.all([
+        CutcSaveSlot.cleanest(limit),
+        CutcSaveSlot.fastest(limit),
+        CutcPlayerStats.top('tilesCleaned', limit),
+    ]);
+
+    res.json({ cleanest, fastest, cleaners });
+});
+
+/**
+ * @swagger
+ * /slots/leaderboards/ranks:
+ *   get:
+ *     summary: Where some players stand on the lobby's leaderboards
+ *     description: For each player, their place on each board (1 for the top), or null for a board they aren't on. A city board ranks their best city among each owner's best. Each place is one indexed count, so a lobby asks for its players every few minutes rather than keeping them.
+ *     tags: [Slots]
+ *     parameters:
+ *       - { in: query, name: userIds, required: true, schema: { type: string }, description: "Roblox user IDs, comma separated, at most 50" }
+ *     responses:
+ *       200:
+ *         description: Each player's places, by user ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ranks: { type: object, additionalProperties: { type: object, properties: { cleanest: { type: integer, nullable: true }, fastest: { type: integer, nullable: true }, cleaners: { type: integer, nullable: true } } } }
+ *       400:
+ *         description: userIds is missing, too long, or not user IDs
+ */
+slotsRouter.get('/leaderboards/ranks', async (req, res) => {
+    const ids = String(req.query.userIds ?? '').split(',').filter((id) => id.length > 0);
+
+    if (ids.length === 0 || ids.length > MAX_RANKED_USERS || !ids.every((id) => /^\d{1,19}$/.test(id)))
+        return res.status(400).json({ error: `userIds must be 1 to ${MAX_RANKED_USERS} comma-separated Roblox user IDs` });
+
+    const unique = [...new Set(ids)];
+    const places = await Promise.all(unique.map(async (id) => {
+        const [cities, cleaners] = await Promise.all([
+            CutcSaveSlot.ranks(id),
+            CutcPlayerStats.rank('tilesCleaned', id),
+        ]);
+        return [id, { ...cities, cleaners }];
+    }));
+
+    res.json({ ranks: Object.fromEntries(places) });
+});
 
 /**
  * @swagger

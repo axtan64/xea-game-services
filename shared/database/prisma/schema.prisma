@@ -140,8 +140,14 @@ model CutcPlayerStats {
     cashEarned     Float    @default(0)
     // The cosmetics worn: { [slot]: cosmeticId }
     cosmetics      Json     @default("{}")
+    // The player's own contracts, every six hours, and the daily streak: { period, tasks, progress, streak, lastDay, best }
+    dailies        Json     @default("{}")
+    // Things the player has seen once, so they stop being pointed out (the shop's dot): { [thingId]: true }
+    seen           Json     @default("{}")
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
+
+    @@index([tilesCleaned])
 }
 
 // One of a player's save slots in Clean Up The City: a whole city, played by one game server at a time
@@ -160,6 +166,9 @@ model CutcSaveSlot {
     partySize    Int       @default(1)
     // Seconds the city has been played, counted while anyone is in it
     playTime     Int       @default(0)
+    // The play time at which the city met its last Depot milestone, for the lobby's fastest cities; null until
+    // then, and for a city where an admin skipped one
+    finishedIn   Int?
     lastPlayedAt DateTime?
     // The session lock: the server playing the slot, and when it last said so (saves and heartbeats refresh it)
     lockId       String?
@@ -177,6 +186,8 @@ model CutcSaveSlot {
     updatedAt    DateTime  @updatedAt
 
     @@unique([ownerId, slot])
+    @@index([cleanShare])
+    @@index([finishedIn])
 }
 
 // Who may join a Clean Up The City save slot besides its owner. Kept apart from CutcSaveSlot so wiping a slot

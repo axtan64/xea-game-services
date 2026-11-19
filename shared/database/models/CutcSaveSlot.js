@@ -9,6 +9,7 @@ const SUMMARY = {
     cash: true,
     partySize: true,
     playTime: true,
+    finishedIn: true,
     lastPlayedAt: true,
     lockId: true,
     lockedAt: true,
@@ -22,7 +23,24 @@ const SUMMARY = {
 };
 
 // The summary fields a save may carry, and the type each must be
-const SUMMARY_FIELDS = { cleanShare: 'number', cash: 'number', partySize: 'number', playTime: 'number' };
+const SUMMARY_FIELDS = { cleanShare: 'number', cash: 'number', partySize: 'number', playTime: 'number', finishedIn: 'number' };
+
+// Keeps the first (best) entry for each owner, up to `limit`, so one player's three cities don't fill a board
+function onePerOwner(rows, limit) {
+    const seen = new Set();
+    const kept = [];
+
+    for (const row of rows) {
+        const owner = String(row.ownerId);
+        if (seen.has(owner)) continue;
+
+        seen.add(owner);
+        kept.push(row);
+        if (kept.length >= limit) break;
+    }
+
+    return kept;
+}
 
 const key = (ownerId, slot) => ({ ownerId: BigInt(ownerId), slot });
 
@@ -69,6 +87,66 @@ class CutcSaveSlot {
             where: { OR: keys.map(({ ownerId, slot }) => key(ownerId, slot)) },
             select: SUMMARY,
         });
+    }
+
+    // The cleanest cities: the most clean share first (the less play time to it, the higher), one per owner. Only
+    // a save writes cleanShare, so a slot locked but never saved has none
+    static async cleanest(limit) {
+        const rows = await getClient().cutcSaveSlot.findMany({
+            where: { cleanShare: { gt: 0 } },
+            orderBy: [{ cleanShare: 'desc' }, { playTime: 'asc' }],
+            take: limit * 3,
+            select: { ownerId: true, slot: true, cleanShare: true, playTime: true },
+        });
+
+        return onePerOwner(rows, limit);
+    }
+
+    // The cities that met their last milestone in the least play time, one per owner
+    static async fastest(limit) {
+        const rows = await getClient().cutcSaveSlot.findMany({
+            where: { finishedIn: { gt: 0 } },
+            orderBy: [{ finishedIn: 'asc' }, { updatedAt: 'asc' }],
+            take: limit * 3,
+            select: { ownerId: true, slot: true, finishedIn: true },
+        });
+
+        return onePerOwner(rows, limit);
+    }
+
+    // Where an owner's best city stands on the cleanest and fastest boards, 1 for the top, or null for a board
+    // they aren't on. Each is one count over an indexed column of the owners whose best city beats theirs, so it
+    // costs about as much as there are cities above it, and nothing is kept between asks
+    static async ranks(ownerId) {
+        const client = getClient();
+        const owner = BigInt(ownerId);
+        const [clean, fast] = await Promise.all([
+            client.cutcSaveSlot.findFirst({
+                where: { ownerId: owner, cleanShare: { gt: 0 } },
+                orderBy: [{ cleanShare: 'desc' }, { playTime: 'asc' }],
+                select: { cleanShare: true, playTime: true },
+            }),
+            client.cutcSaveSlot.findFirst({
+                where: { ownerId: owner, finishedIn: { gt: 0 } },
+                orderBy: [{ finishedIn: 'asc' }, { updatedAt: 'asc' }],
+                select: { finishedIn: true, updatedAt: true },
+            }),
+        ]);
+        const [cleanest, fastest] = await Promise.all([
+            clean && client.$queryRaw`
+                SELECT COUNT(DISTINCT "ownerId")::int AS "above" FROM "CutcSaveSlot"
+                WHERE "cleanShare" > ${clean.cleanShare}
+                    OR ("cleanShare" = ${clean.cleanShare} AND "playTime" < ${clean.playTime})`,
+            fast && client.$queryRaw`
+                SELECT COUNT(DISTINCT "ownerId")::int AS "above" FROM "CutcSaveSlot"
+                WHERE "finishedIn" > 0 AND ("finishedIn" < ${fast.finishedIn}
+                    OR ("finishedIn" = ${fast.finishedIn} AND "updatedAt" < ${fast.updatedAt}))`,
+        ]);
+
+        return {
+            cleanest: cleanest ? cleanest[0].above + 1 : null,
+            fastest: fastest ? fastest[0].above + 1 : null,
+        };
     }
 
     static summary(ownerId, slot) {
