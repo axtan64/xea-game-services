@@ -45,6 +45,37 @@ class Purchase {
             orderBy: { purchasedAt: 'desc' },
         });
     }
+
+    // The newest purchases, with who bought them, for whom and in which game: for the dashboard's log. `robloxId`
+    // narrows them to those that user made or was given
+    static recent({ gameId, robloxId, take = 50 } = {}) {
+        const who = robloxId != null ? { robloxId: BigInt(robloxId) } : null;
+
+        return getClient().purchase.findMany({
+            where: {
+                ...(gameId && { gameId }),
+                ...(who && { OR: [{ user: who }, { recipient: who }] }),
+            },
+            include: {
+                user: { select: { robloxId: true } },
+                recipient: { select: { robloxId: true } },
+                game: { select: { slug: true } },
+            },
+            orderBy: { purchasedAt: 'desc' },
+            take,
+        });
+    }
+
+    // How many sales there were since `since`, and the Robux they took. Grants (no price) aren't sales
+    static async totalSince(since, gameId) {
+        const result = await getClient().purchase.aggregate({
+            where: { purchasedAt: { gte: since }, priceRobux: { gt: 0 }, ...(gameId && { gameId }) },
+            _count: { _all: true },
+            _sum: { priceRobux: true },
+        });
+
+        return { count: result._count._all, robux: result._sum.priceRobux ?? 0 };
+    }
 }
 
 module.exports = Purchase;

@@ -148,6 +148,7 @@ model CutcPlayerStats {
     updatedAt      DateTime @updatedAt
 
     @@index([tilesCleaned])
+    @@index([cashEarned])
 }
 
 // One of a player's save slots in Clean Up The City: a whole city, played by one game server at a time
@@ -182,6 +183,9 @@ model CutcSaveSlot {
     playerCount  Int       @default(0)
     maxPlayers   Int       @default(8)
     ownerPresent Boolean   @default(false)
+    // Who is in it, as Roblox user IDs (strings), so an admin's /join can find the city a player is in: a city's
+    // reserved server can't be found from the player's own server
+    players      Json      @default("[]")
     createdAt    DateTime  @default(now())
     updatedAt    DateTime  @updatedAt
 

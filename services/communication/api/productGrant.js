@@ -43,7 +43,7 @@ productGrantRouter.post('/', async (req, res) => {
         res.status(204).send();
     } catch (err) {
         console.error('Error publishing product grant:', err);
-        res.status(502).json({ error: 'Failed to reach Roblox messaging service' });
+        res.status(502).json({ error: 'Failed to reach Roblox messaging service', detail: err.message });
     }
 });
 

@@ -64,7 +64,7 @@ announceRouter.post('/', async (req, res) => {
 
         console.error('Error publishing announcement:', err);
 
-        res.status(502).json({ error: 'Failed to reach Roblox messaging service' });
+        res.status(502).json({ error: 'Failed to reach Roblox messaging service', detail: err.message });
     }
 });
 

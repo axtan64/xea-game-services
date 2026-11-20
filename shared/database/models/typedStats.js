@@ -54,6 +54,11 @@ function createPlayerStatsModel(prismaModelName, fields) {
         static delete(robloxId) {
             return delegate().delete({ where: { robloxId: BigInt(robloxId) } });
         }
+
+        // How many players have stats in this game: everyone who has ever played it
+        static count() {
+            return delegate().count();
+        }
     };
 }
 

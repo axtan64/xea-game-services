@@ -18,8 +18,9 @@ const MOST_PLAYERS = 100;
 const MAX_FRIENDS = 1000;
 // A party that set off this recently may not have reached its server yet, so the city counts as opening
 const LAUNCH_WINDOW_MS = 90 * 1000;
-// How many places each of the lobby's leaderboards shows, unless it asks for fewer
-const LEADERBOARD_SIZE = 10;
+// How many places each of the lobby's leaderboards shows, unless it asks for fewer (the user, 2026-11-20: 25, in a
+// list that scrolls)
+const LEADERBOARD_SIZE = 25;
 // The most players one ask for ranks may name (a lobby server's players, in batches)
 const MAX_RANKED_USERS = 50;
 
@@ -92,6 +93,15 @@ const readPresence = (req) => (typeof req.body?.presence === 'object' && req.bod
  *         lockId: { type: string, nullable: true }
  *         lockedAt: { type: string, nullable: true }
  *         isLocked: { type: boolean, description: Whether a server holds a live lock }
+ *     BoardPlayer:
+ *       type: object
+ *       description: A place on a player board, with the player's lifetime stats
+ *       properties:
+ *         robloxId: { type: string }
+ *         tilesCleaned: { type: integer }
+ *         litterPickedUp: { type: integer }
+ *         cashEarned: { type: number }
+ *         timePlayed: { type: integer, description: Seconds played, in every city }
  */
 
 /**
@@ -99,10 +109,10 @@ const readPresence = (req) => (typeof req.body?.presence === 'object' && req.bod
  * /slots/leaderboards:
  *   get:
  *     summary: The lobby's leaderboards
- *     description: The cleanest cities (by clean share), the fastest to meet every Depot milestone (by play time), and the players who have cleaned the most tiles. Each city board shows one city per owner. Declared before /slots/{ownerId}, which would take the path otherwise.
+ *     description: The players who have earned the most cash, ever (it replaced the cleanest cities on 2026-11-20, which filled with finished cities), the cities fastest to meet every Depot milestone (by play time), and the players who have cleaned the most tiles. The city board shows one city per owner. A player board's places carry each player's lifetime stats and play time; the city board's, the city's play time and clean share. Declared before /slots/{ownerId}, which would take the path otherwise.
  *     tags: [Slots]
  *     parameters:
- *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 10 }, description: Places on each board }
+ *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 25 }, description: Places on each board }
  *     responses:
  *       200:
  *         description: The boards, best first
@@ -111,21 +121,21 @@ const readPresence = (req) => (typeof req.body?.presence === 'object' && req.bod
  *             schema:
  *               type: object
  *               properties:
- *                 cleanest: { type: array, items: { type: object, properties: { ownerId: { type: string }, slot: { type: integer }, cleanShare: { type: number }, playTime: { type: integer } } } }
- *                 fastest: { type: array, items: { type: object, properties: { ownerId: { type: string }, slot: { type: integer }, finishedIn: { type: integer } } } }
- *                 cleaners: { type: array, items: { type: object, properties: { robloxId: { type: string }, tilesCleaned: { type: integer } } } }
+ *                 earners: { type: array, items: { $ref: '#/components/schemas/BoardPlayer' } }
+ *                 fastest: { type: array, items: { type: object, properties: { ownerId: { type: string }, slot: { type: integer }, finishedIn: { type: integer }, playTime: { type: integer }, cleanShare: { type: number } } } }
+ *                 cleaners: { type: array, items: { $ref: '#/components/schemas/BoardPlayer' } }
  */
 slotsRouter.get('/leaderboards', async (req, res) => {
     const asked = Number(req.query.limit ?? LEADERBOARD_SIZE);
     const limit = Number.isInteger(asked) ? Math.min(Math.max(asked, 1), LEADERBOARD_SIZE) : LEADERBOARD_SIZE;
 
-    const [cleanest, fastest, cleaners] = await Promise.all([
-        CutcSaveSlot.cleanest(limit),
+    const [earners, fastest, cleaners] = await Promise.all([
+        CutcPlayerStats.top('cashEarned', limit),
         CutcSaveSlot.fastest(limit),
         CutcPlayerStats.top('tilesCleaned', limit),
     ]);
 
-    res.json({ cleanest, fastest, cleaners });
+    res.json({ earners, fastest, cleaners });
 });
 
 /**
@@ -145,7 +155,7 @@ slotsRouter.get('/leaderboards', async (req, res) => {
  *             schema:
  *               type: object
  *               properties:
- *                 ranks: { type: object, additionalProperties: { type: object, properties: { cleanest: { type: integer, nullable: true }, fastest: { type: integer, nullable: true }, cleaners: { type: integer, nullable: true } } } }
+ *                 ranks: { type: object, additionalProperties: { type: object, properties: { earners: { type: integer, nullable: true }, fastest: { type: integer, nullable: true }, cleaners: { type: integer, nullable: true } } } }
  *       400:
  *         description: userIds is missing, too long, or not user IDs
  */
@@ -157,14 +167,49 @@ slotsRouter.get('/leaderboards/ranks', async (req, res) => {
 
     const unique = [...new Set(ids)];
     const places = await Promise.all(unique.map(async (id) => {
-        const [cities, cleaners] = await Promise.all([
+        const [cities, earners, cleaners] = await Promise.all([
             CutcSaveSlot.ranks(id),
+            CutcPlayerStats.rank('cashEarned', id),
             CutcPlayerStats.rank('tilesCleaned', id),
         ]);
-        return [id, { ...cities, cleaners }];
+        return [id, { ...cities, earners, cleaners }];
     }));
 
     res.json({ ranks: Object.fromEntries(places) });
+});
+
+/**
+ * @swagger
+ * /slots/playing/{userId}:
+ *   get:
+ *     summary: Which city a player is in now
+ *     description: The live city whose server last named them among its players (each save and heartbeat says who is in it). For an admin's /join, which can't find a city's reserved server from the player's own server. Declared before /slots/{ownerId}, which would take the path otherwise.
+ *     tags: [Slots]
+ *     parameters:
+ *       - { in: path, name: userId, required: true, schema: { type: string }, description: Roblox user ID }
+ *     responses:
+ *       200:
+ *         description: The city
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ownerId: { type: string }
+ *                 slot: { type: integer }
+ *       400: { description: userId isn't a Roblox user ID }
+ *       404: { description: They aren't in a city being played }
+ */
+slotsRouter.get('/playing/:userId', async (req, res) => {
+    if (!/^\d{1,19}$/.test(req.params.userId))
+        return res.status(400).json({ error: 'userId must be a Roblox user ID' });
+
+    const city = await CutcSaveSlot.playing(req.params.userId, LOCK_STALE_MS);
+
+    if (!city)
+        return res.status(404).json({ error: 'Not in a city being played' });
+
+    res.json({ ownerId: String(city.ownerId), slot: city.slot });
 });
 
 /**
@@ -371,16 +416,20 @@ slotsRouter.delete('/:ownerId/:slot', async (req, res) => {
  * @param {object} access The slot's CutcSlotAccess (or its defaults)
  * @param {object|null} slot The slot's summary, if it has ever been locked
  * @param {boolean} isFriend Whether the game server found the player to be the owner's Roblox friend
+ * @param {boolean} [isStaff] Whether the game server found the player to be staff: they go into any city being
+ *     played, shut, full or with its owner away (the user, 2026-11-20: admins "join private cities no matter
+ *     what"), but never open one nobody is playing
  * @returns {{ allowed: boolean, live: boolean, reason?: string }} `live` says a server is playing it and can
  *     be joined. Reasons: Closed (shut to everyone), NotInvited, NotStarted (never played), OwnerAway, Full,
  *     InPlay (a server holds it that can't be joined)
  */
-function judge(access, slot, userId, isFriend) {
+function judge(access, slot, userId, isFriend, isStaff = false) {
     const held = slot != null && isLocked(slot);
     const live = held && slot.serverId != null && slot.accessCode != null;
 
     if (held && !live) return { allowed: false, live, reason: 'InPlay' };
     if (String(access.ownerId) === String(userId)) return { allowed: true, live };
+    if (isStaff && live) return { allowed: true, live };
     if (access.access === 'Nobody') return { allowed: false, live, reason: 'Closed' };
 
     const isInvited = CutcSlotAccess.isMember(access, userId);
@@ -622,7 +671,7 @@ slotsRouter.delete('/:ownerId/:slot/members', async (req, res) => {
  * /slots/{ownerId}/{slot}/enter:
  *   post:
  *     summary: Ask to go into a city, and learn which server to go to
- *     description: Checks the player may (the owner always may). If a server is playing the city, or a party set off for it in the last 90 seconds, answers that server. Otherwise answers `Closed`, and the lobby reserves a server and asks again with it as `candidate`, which is recorded as the party's and answered `Opened` (or, if someone got there first, theirs is answered instead).
+ *     description: Checks the player may (the owner always may, and staff may go into any city being played). If a server is playing the city, or a party set off for it in the last 90 seconds, answers that server. Otherwise answers `Closed`, and the lobby reserves a server and asks again with it as `candidate`, which is recorded as the party's and answered `Opened` (or, if someone got there first, theirs is answered instead).
  *     tags: [Slots]
  *     parameters:
  *       - { in: path, name: ownerId, required: true, schema: { type: string } }
@@ -636,6 +685,7 @@ slotsRouter.delete('/:ownerId/:slot/members', async (req, res) => {
  *             properties:
  *               userId: { type: number, description: Who is asking }
  *               isFriend: { type: boolean, description: Whether the game server found them to be the owner's friend }
+ *               isStaff: { type: boolean, description: "Whether the game server found them to be staff (the game's owner or an admin): they may go into any city being played, whatever its sharing" }
  *               members: { type: array, items: { type: number }, description: Who travels with them }
  *               candidate:
  *                 type: object
@@ -648,7 +698,7 @@ slotsRouter.delete('/:ownerId/:slot/members', async (req, res) => {
  *       403: { description: "Not allowed in. `reason`: Closed, NotInvited, NotStarted, OwnerAway, Full or InPlay" }
  */
 slotsRouter.post('/:ownerId/:slot/enter', async (req, res) => {
-    const { userId, isFriend, members, candidate } = req.body ?? {};
+    const { userId, isFriend, isStaff, members, candidate } = req.body ?? {};
     const ownerId = req.params.ownerId;
 
     if (!isRobloxId(userId))
@@ -668,7 +718,7 @@ slotsRouter.post('/:ownerId/:slot/enter', async (req, res) => {
         CutcSlotAccess.get(ownerId, req.slot),
         CutcSaveSlot.summary(ownerId, req.slot),
     ]);
-    const verdict = judge(access, slot, userId, isFriend === true);
+    const verdict = judge(access, slot, userId, isFriend === true, isStaff === true);
 
     if (!verdict.allowed)
         return res.status(403).json({ error: 'Not allowed into this city', reason: verdict.reason });

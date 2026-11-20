@@ -4,9 +4,13 @@ const { createPlayerStatsModel } = require('./typedStats');
 const STAT_FIELDS = ['timePlayed', 'settings', 'ownedProducts', 'cash', 'contractTokens', 'litterIndex', 'classes', 'equippedClass', 'easterEggs', 'litterPickedUp', 'tilesCleaned', 'cashEarned', 'cosmetics', 'dailies', 'seen'];
 // The lifetime stats the lobby's leaderboards may rank players by
 const RANKED_FIELDS = ['tilesCleaned', 'litterPickedUp', 'cashEarned'];
+// What each place on a player board carries besides its own figure: the lifetime stats and play time, for the line
+// the lobby opens under a row
+const BOARD_FIELDS = { robloxId: true, tilesCleaned: true, litterPickedUp: true, cashEarned: true, timePlayed: true };
 
 class CutcPlayerStats extends createPlayerStatsModel('cutcPlayerStats', STAT_FIELDS) {
-    // The players with the most of a lifetime stat, most first: [{ robloxId, [field] }]
+    // The players with the most of a lifetime stat, most first: [{ robloxId, tilesCleaned, litterPickedUp,
+    // cashEarned, timePlayed }]
     static top(field, limit) {
         if (!RANKED_FIELDS.includes(field))
             throw new Error(`${field} is not a ranked stat`);
@@ -15,7 +19,7 @@ class CutcPlayerStats extends createPlayerStatsModel('cutcPlayerStats', STAT_FIE
             where: { [field]: { gt: 0 } },
             orderBy: [{ [field]: 'desc' }, { robloxId: 'asc' }],
             take: limit,
-            select: { robloxId: true, [field]: true },
+            select: BOARD_FIELDS,
         });
     }
 

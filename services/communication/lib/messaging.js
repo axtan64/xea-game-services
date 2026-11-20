@@ -42,4 +42,20 @@ function publishProductGrant(universeId, apiKey, recipientUserId, productKey) {
     return publishMessage(universeId, apiKey, PRODUCT_GRANTED_TOPIC, { recipientUserId, productKey });
 }
 
-module.exports = { publishAnnouncement, publishProductGrant, MAX_MESSAGE_BYTES };
+// Must match Topics.AccountChanged on the Roblox side: a live server re-reads the account's roles and ban, and kicks
+// the player if banned or if kickReason is given
+const ACCOUNT_CHANGED_TOPIC = 'ACCOUNT_CHANGED';
+
+function publishAccountChanged(universeId, apiKey, userId, kickReason) {
+    return publishMessage(universeId, apiKey, ACCOUNT_CHANGED_TOPIC, kickReason ? { userId, kickReason } : { userId });
+}
+
+// Must match Topics.SoftRestart on the Roblox side: every live server saves and moves its players on to a fresh
+// server (a city to a new server of the same city, the lobby to a new lobby), so they pick up the latest version
+const SOFT_RESTART_TOPIC = 'SOFT_RESTART';
+
+function publishSoftRestart(universeId, apiKey, requestedBy) {
+    return publishMessage(universeId, apiKey, SOFT_RESTART_TOPIC, requestedBy ? { requestedBy } : {});
+}
+
+module.exports = { publishAnnouncement, publishProductGrant, publishAccountChanged, publishSoftRestart, MAX_MESSAGE_BYTES };

@@ -41,6 +41,25 @@ class GameMembership {
         });
     }
 
+    // Everyone who is an admin of the game, with their Roblox IDs
+    static admins(gameId) {
+        return getClient().gameMembership.findMany({
+            where: { gameId, isAdmin: true },
+            include: { user: { select: { robloxId: true } } },
+            orderBy: { updatedAt: 'desc' },
+        });
+    }
+
+    // Everyone banned from the game, newest first, whether or not their ban has run out
+    static banned(gameId, take = 100) {
+        return getClient().gameMembership.findMany({
+            where: { gameId, bannedAt: { not: null } },
+            include: { user: { select: { robloxId: true } } },
+            orderBy: { bannedAt: 'desc' },
+            take,
+        });
+    }
+
     static async makeAdmin(gameId, robloxId) {
         const user = await User.getOrCreateByRobloxId(robloxId);
 

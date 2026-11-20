@@ -50,6 +50,8 @@ const MOST_PLAYERS = 100;
 // A lock nobody has refreshed for `staleMs` no longer holds: its server crashed or was shut without saving
 const staleBefore = (staleMs) => new Date(Date.now() - staleMs);
 
+const isUserId = (value) => Number.isSafeInteger(value) && value > 0;
+
 // Who a server says is in its city, as columns; nothing if it didn't say
 function readPresence(presence) {
     const fields = {};
@@ -58,12 +60,14 @@ function readPresence(presence) {
     if (Number.isInteger(presence?.maxPlayers) && presence.maxPlayers >= 1 && presence.maxPlayers <= MOST_PLAYERS)
         fields.maxPlayers = presence.maxPlayers;
     if (typeof presence?.ownerPresent === 'boolean') fields.ownerPresent = presence.ownerPresent;
+    if (Array.isArray(presence?.players) && presence.players.length <= MOST_PLAYERS && presence.players.every(isUserId))
+        fields.players = presence.players.map(String);
 
     return fields;
 }
 
 // What a slot with no live session has in its session columns
-const NO_SESSION = { serverId: null, accessCode: null, playerCount: 0, ownerPresent: false };
+const NO_SESSION = { serverId: null, accessCode: null, playerCount: 0, ownerPresent: false, players: [] };
 
 /**
  * A player's save slots in Clean Up The City. A slot is a whole city (the game's own JSON blob, opaque here) plus
@@ -89,64 +93,58 @@ class CutcSaveSlot {
         });
     }
 
-    // The cleanest cities: the most clean share first (the less play time to it, the higher), one per owner. Only
-    // a save writes cleanShare, so a slot locked but never saved has none
-    static async cleanest(limit) {
-        const rows = await getClient().cutcSaveSlot.findMany({
-            where: { cleanShare: { gt: 0 } },
-            orderBy: [{ cleanShare: 'desc' }, { playTime: 'asc' }],
-            take: limit * 3,
-            select: { ownerId: true, slot: true, cleanShare: true, playTime: true },
-        });
-
-        return onePerOwner(rows, limit);
-    }
-
     // The cities that met their last milestone in the least play time, one per owner
     static async fastest(limit) {
         const rows = await getClient().cutcSaveSlot.findMany({
             where: { finishedIn: { gt: 0 } },
             orderBy: [{ finishedIn: 'asc' }, { updatedAt: 'asc' }],
             take: limit * 3,
-            select: { ownerId: true, slot: true, finishedIn: true },
+            select: { ownerId: true, slot: true, finishedIn: true, playTime: true, cleanShare: true },
         });
 
         return onePerOwner(rows, limit);
     }
 
-    // Where an owner's best city stands on the cleanest and fastest boards, 1 for the top, or null for a board
-    // they aren't on. Each is one count over an indexed column of the owners whose best city beats theirs, so it
-    // costs about as much as there are cities above it, and nothing is kept between asks
+    // Where an owner's best city stands on the fastest board, 1 for the top, or null if they aren't on it. One count
+    // over an indexed column of the owners whose best city beats theirs, so it costs about as much as there are
+    // cities above it, and nothing is kept between asks
     static async ranks(ownerId) {
         const client = getClient();
-        const owner = BigInt(ownerId);
-        const [clean, fast] = await Promise.all([
-            client.cutcSaveSlot.findFirst({
-                where: { ownerId: owner, cleanShare: { gt: 0 } },
-                orderBy: [{ cleanShare: 'desc' }, { playTime: 'asc' }],
-                select: { cleanShare: true, playTime: true },
-            }),
-            client.cutcSaveSlot.findFirst({
-                where: { ownerId: owner, finishedIn: { gt: 0 } },
-                orderBy: [{ finishedIn: 'asc' }, { updatedAt: 'asc' }],
-                select: { finishedIn: true, updatedAt: true },
-            }),
-        ]);
-        const [cleanest, fastest] = await Promise.all([
-            clean && client.$queryRaw`
-                SELECT COUNT(DISTINCT "ownerId")::int AS "above" FROM "CutcSaveSlot"
-                WHERE "cleanShare" > ${clean.cleanShare}
-                    OR ("cleanShare" = ${clean.cleanShare} AND "playTime" < ${clean.playTime})`,
-            fast && client.$queryRaw`
-                SELECT COUNT(DISTINCT "ownerId")::int AS "above" FROM "CutcSaveSlot"
-                WHERE "finishedIn" > 0 AND ("finishedIn" < ${fast.finishedIn}
-                    OR ("finishedIn" = ${fast.finishedIn} AND "updatedAt" < ${fast.updatedAt}))`,
-        ]);
+        const fast = await client.cutcSaveSlot.findFirst({
+            where: { ownerId: BigInt(ownerId), finishedIn: { gt: 0 } },
+            orderBy: [{ finishedIn: 'asc' }, { updatedAt: 'asc' }],
+            select: { finishedIn: true, updatedAt: true },
+        });
+        if (!fast) return { fastest: null };
 
-        return {
-            cleanest: cleanest ? cleanest[0].above + 1 : null,
-            fastest: fastest ? fastest[0].above + 1 : null,
-        };
+        const [{ above }] = await client.$queryRaw`
+            SELECT COUNT(DISTINCT "ownerId")::int AS "above" FROM "CutcSaveSlot"
+            WHERE "finishedIn" > 0 AND ("finishedIn" < ${fast.finishedIn}
+                OR ("finishedIn" = ${fast.finishedIn} AND "updatedAt" < ${fast.updatedAt}))`;
+        return { fastest: above + 1 };
+    }
+
+    // Every city being played now, newest lock first, with who is in it: for the dashboard's live cities
+    static live(staleMs) {
+        return getClient().cutcSaveSlot.findMany({
+            where: { lockId: { not: null }, lockedAt: { gt: staleBefore(staleMs) } },
+            select: { ...SUMMARY, players: true },
+            orderBy: { lockedAt: 'desc' },
+        });
+    }
+
+    // The live city a player is in, as its server last said with a save or heartbeat, or null. For an admin's
+    // /join: the newest lock wins, should a stale entry linger after a crash
+    static playing(userId, staleMs) {
+        return getClient().cutcSaveSlot.findFirst({
+            where: {
+                players: { array_contains: [String(userId)] },
+                lockId: { not: null },
+                lockedAt: { gt: staleBefore(staleMs) },
+            },
+            orderBy: { lockedAt: 'desc' },
+            select: { ownerId: true, slot: true },
+        });
     }
 
     static summary(ownerId, slot) {

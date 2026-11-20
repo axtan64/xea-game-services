@@ -123,8 +123,11 @@ services:
       - ROBLOX_OAUTH_CLIENT_SECRET=${ROBLOX_OAUTH_CLIENT_SECRET}
       - ROBLOX_OAUTH_REDIRECT_URI=${ROBLOX_OAUTH_REDIRECT_URI}
       - DASHBOARD_SESSION_SECRET=${DASHBOARD_SESSION_SECRET}
+      # Announcements, gifts and account changes go out through it, with the game's Open Cloud key from its Game row
+      - COMMUNICATION_SERVICE_URL=http://communication:3000
     depends_on:
       - postgres
+      - communication
 
   # Free Cloudflare Quick Tunnel for the dashboard, same as the gateway's `cloudflared` below
   cloudflared-dashboard:

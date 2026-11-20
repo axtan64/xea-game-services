@@ -1,4 +1,21 @@
 import { Link, useLocation } from 'react-router-dom';
+import { GamePicker } from './games.jsx';
+
+// The sidebar's pages, in order. Announce to Purchases work on the game picked above them
+const PAGES = [
+    { to: '/', label: 'Overview' },
+    { to: '/announce', label: 'Announce' },
+    { to: '/players', label: 'Players' },
+    { to: '/moderation', label: 'Moderation' },
+    { to: '/cities', label: 'Live cities' },
+    { to: '/purchases', label: 'Purchases' },
+    { to: '/games', label: 'Games' },
+    { to: '/settings', label: 'Settings' },
+];
+
+function isActive(pathname, to) {
+    return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`);
+}
 
 export default function Shell({ profile, children }) {
     const location = useLocation();
@@ -38,9 +55,13 @@ export default function Shell({ profile, children }) {
             </div>
             <div className="layout">
                 <div className="sidebar left">
+                    <GamePicker />
                     <div className="nav">
-                        <Link className={`tab ${location.pathname === '/' ? 'active' : ''}`} to="/">Home</Link>
-                        <Link className={`tab ${location.pathname === '/settings' ? 'active' : ''}`} to="/settings">Settings</Link>
+                        {PAGES.map((page) => (
+                            <Link key={page.to} className={`tab ${isActive(location.pathname, page.to) ? 'active' : ''}`} to={page.to}>
+                                {page.label}
+                            </Link>
+                        ))}
                     </div>
                 </div>
                 <div className="content scroll">{children}</div>
