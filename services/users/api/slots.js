@@ -89,6 +89,7 @@ const readPresence = (req) => (typeof req.body?.presence === 'object' && req.bod
  *         partySize: { type: integer }
  *         playTime: { type: integer, description: Seconds the city has been played }
  *         finishedIn: { type: integer, nullable: true, description: The play time at which it met its last milestone }
+ *         boughtProducts: { type: boolean, description: Whether anyone bought a developer product for it before it met its last milestone }
  *         lastPlayedAt: { type: string, nullable: true }
  *         lockId: { type: string, nullable: true }
  *         lockedAt: { type: string, nullable: true }
@@ -102,6 +103,15 @@ const readPresence = (req) => (typeof req.body?.presence === 'object' && req.bod
  *         litterPickedUp: { type: integer }
  *         cashEarned: { type: number }
  *         timePlayed: { type: integer, description: Seconds played, in every city }
+ *     BoardCity:
+ *       type: object
+ *       description: A place on the fastest board, a city
+ *       properties:
+ *         ownerId: { type: string }
+ *         slot: { type: integer }
+ *         finishedIn: { type: integer }
+ *         playTime: { type: integer }
+ *         cleanShare: { type: number }
  */
 
 /**
@@ -109,7 +119,7 @@ const readPresence = (req) => (typeof req.body?.presence === 'object' && req.bod
  * /slots/leaderboards:
  *   get:
  *     summary: The lobby's leaderboards
- *     description: The players who have earned the most cash, ever (it replaced the cleanest cities on 2026-11-20, which filled with finished cities), the cities fastest to meet every Depot milestone (by play time), and the players who have cleaned the most tiles. The city board shows one city per owner. A player board's places carry each player's lifetime stats and play time; the city board's, the city's play time and clean share. Declared before /slots/{ownerId}, which would take the path otherwise.
+ *     description: The players who have earned the most cash, ever (it replaced the cleanest cities on 2026-11-20, which filled with finished cities), the cities fastest to meet every Depot milestone (by play time) in two lists, those nobody bought a developer product for before they finished (fastest) and those somebody did (fastestBought), and the players who have cleaned the most tiles. The city board shows one city per owner. A player board's places carry each player's lifetime stats and play time; the city board's, the city's play time and clean share. Declared before /slots/{ownerId}, which would take the path otherwise.
  *     tags: [Slots]
  *     parameters:
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 25 }, description: Places on each board }
@@ -122,20 +132,22 @@ const readPresence = (req) => (typeof req.body?.presence === 'object' && req.bod
  *               type: object
  *               properties:
  *                 earners: { type: array, items: { $ref: '#/components/schemas/BoardPlayer' } }
- *                 fastest: { type: array, items: { type: object, properties: { ownerId: { type: string }, slot: { type: integer }, finishedIn: { type: integer }, playTime: { type: integer }, cleanShare: { type: number } } } }
+ *                 fastest: { type: array, items: { $ref: '#/components/schemas/BoardCity' } }
+ *                 fastestBought: { type: array, items: { $ref: '#/components/schemas/BoardCity' } }
  *                 cleaners: { type: array, items: { $ref: '#/components/schemas/BoardPlayer' } }
  */
 slotsRouter.get('/leaderboards', async (req, res) => {
     const asked = Number(req.query.limit ?? LEADERBOARD_SIZE);
     const limit = Number.isInteger(asked) ? Math.min(Math.max(asked, 1), LEADERBOARD_SIZE) : LEADERBOARD_SIZE;
 
-    const [earners, fastest, cleaners] = await Promise.all([
+    const [earners, fastest, fastestBought, cleaners] = await Promise.all([
         CutcPlayerStats.top('cashEarned', limit),
-        CutcSaveSlot.fastest(limit),
+        CutcSaveSlot.fastest(limit, false),
+        CutcSaveSlot.fastest(limit, true),
         CutcPlayerStats.top('tilesCleaned', limit),
     ]);
 
-    res.json({ earners, fastest, cleaners });
+    res.json({ earners, fastest, fastestBought, cleaners });
 });
 
 /**
@@ -155,7 +167,7 @@ slotsRouter.get('/leaderboards', async (req, res) => {
  *             schema:
  *               type: object
  *               properties:
- *                 ranks: { type: object, additionalProperties: { type: object, properties: { earners: { type: integer, nullable: true }, fastest: { type: integer, nullable: true }, cleaners: { type: integer, nullable: true } } } }
+ *                 ranks: { type: object, additionalProperties: { type: object, properties: { earners: { type: integer, nullable: true }, fastest: { type: integer, nullable: true }, fastestBought: { type: integer, nullable: true }, cleaners: { type: integer, nullable: true } } } }
  *       400:
  *         description: userIds is missing, too long, or not user IDs
  */

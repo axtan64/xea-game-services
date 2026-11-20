@@ -1,7 +1,7 @@
 const { getClient } = require('../client');
 const { createPlayerStatsModel } = require('./typedStats');
 
-const STAT_FIELDS = ['timePlayed', 'settings', 'ownedProducts', 'cash', 'contractTokens', 'litterIndex', 'classes', 'equippedClass', 'easterEggs', 'litterPickedUp', 'tilesCleaned', 'cashEarned', 'cosmetics', 'dailies', 'seen'];
+const STAT_FIELDS = ['timePlayed', 'settings', 'ownedProducts', 'cash', 'contractTokens', 'litterIndex', 'classes', 'equippedClass', 'easterEggs', 'litterPickedUp', 'tilesCleaned', 'cashEarned', 'cosmetics', 'dailies', 'seen', 'peoplePushed', 'propsToppled', 'robuxSpent', 'playerColor', 'explosives'];
 // The lifetime stats the lobby's leaderboards may rank players by
 const RANKED_FIELDS = ['tilesCleaned', 'litterPickedUp', 'cashEarned'];
 // What each place on a player board carries besides its own figure: the lifetime stats and play time, for the line

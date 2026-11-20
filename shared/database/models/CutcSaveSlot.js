@@ -10,6 +10,7 @@ const SUMMARY = {
     partySize: true,
     playTime: true,
     finishedIn: true,
+    boughtProducts: true,
     lastPlayedAt: true,
     lockId: true,
     lockedAt: true,
@@ -23,7 +24,17 @@ const SUMMARY = {
 };
 
 // The summary fields a save may carry, and the type each must be
-const SUMMARY_FIELDS = { cleanShare: 'number', cash: 'number', partySize: 'number', playTime: 'number', finishedIn: 'number' };
+const SUMMARY_FIELDS = {
+    cleanShare: 'number',
+    cash: 'number',
+    partySize: 'number',
+    playTime: 'number',
+    finishedIn: 'number',
+    boughtProducts: 'boolean',
+};
+
+// Whether a summary's value is of its field's type (and a number a finite one)
+const isSummaryValue = (value, type) => typeof value === type && (type !== 'number' || Number.isFinite(value));
 
 // Keeps the first (best) entry for each owner, up to `limit`, so one player's three cities don't fill a board
 function onePerOwner(rows, limit) {
@@ -93,10 +104,11 @@ class CutcSaveSlot {
         });
     }
 
-    // The cities that met their last milestone in the least play time, one per owner
-    static async fastest(limit) {
+    // The cities that met their last milestone in the least play time, one per owner: those that bought nothing
+    // for it, or with `bought` those that did (each its own list on the fastest board)
+    static async fastest(limit, bought = false) {
         const rows = await getClient().cutcSaveSlot.findMany({
-            where: { finishedIn: { gt: 0 } },
+            where: { finishedIn: { gt: 0 }, boughtProducts: bought },
             orderBy: [{ finishedIn: 'asc' }, { updatedAt: 'asc' }],
             take: limit * 3,
             select: { ownerId: true, slot: true, finishedIn: true, playTime: true, cleanShare: true },
@@ -105,23 +117,32 @@ class CutcSaveSlot {
         return onePerOwner(rows, limit);
     }
 
-    // Where an owner's best city stands on the fastest board, 1 for the top, or null if they aren't on it. One count
-    // over an indexed column of the owners whose best city beats theirs, so it costs about as much as there are
-    // cities above it, and nothing is kept between asks
-    static async ranks(ownerId) {
+    // Where an owner's best city stands on one of the fastest board's lists, 1 for the top, or null if they aren't
+    // on it. One count over an indexed column of the owners whose best city beats theirs, so it costs about as much
+    // as there are cities above it, and nothing is kept between asks
+    static async rank(ownerId, bought) {
         const client = getClient();
         const fast = await client.cutcSaveSlot.findFirst({
-            where: { ownerId: BigInt(ownerId), finishedIn: { gt: 0 } },
+            where: { ownerId: BigInt(ownerId), finishedIn: { gt: 0 }, boughtProducts: bought },
             orderBy: [{ finishedIn: 'asc' }, { updatedAt: 'asc' }],
             select: { finishedIn: true, updatedAt: true },
         });
-        if (!fast) return { fastest: null };
+        if (!fast) return null;
 
         const [{ above }] = await client.$queryRaw`
             SELECT COUNT(DISTINCT "ownerId")::int AS "above" FROM "CutcSaveSlot"
-            WHERE "finishedIn" > 0 AND ("finishedIn" < ${fast.finishedIn}
+            WHERE "finishedIn" > 0 AND "boughtProducts" = ${bought} AND ("finishedIn" < ${fast.finishedIn}
                 OR ("finishedIn" = ${fast.finishedIn} AND "updatedAt" < ${fast.updatedAt}))`;
-        return { fastest: above + 1 };
+        return above + 1;
+    }
+
+    // Where an owner's best city stands on both of the fastest board's lists
+    static async ranks(ownerId) {
+        const [fastest, fastestBought] = await Promise.all([
+            CutcSaveSlot.rank(ownerId, false),
+            CutcSaveSlot.rank(ownerId, true),
+        ]);
+        return { fastest, fastestBought };
     }
 
     // Every city being played now, newest lock first, with who is in it: for the dashboard's live cities
@@ -193,7 +214,7 @@ class CutcSaveSlot {
     static async save(ownerId, slot, lockId, data, summary = {}, presence = {}) {
         const fields = {};
         for (const [name, type] of Object.entries(SUMMARY_FIELDS))
-            if (typeof summary[name] === type && Number.isFinite(summary[name])) fields[name] = summary[name];
+            if (isSummaryValue(summary[name], type)) fields[name] = summary[name];
 
         const now = new Date();
         const { count } = await getClient().cutcSaveSlot.updateMany({

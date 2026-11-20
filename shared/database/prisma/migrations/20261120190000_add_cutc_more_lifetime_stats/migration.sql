@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "CutcPlayerStats" ADD COLUMN     "peoplePushed" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "propsToppled" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "robuxSpent" INTEGER NOT NULL DEFAULT 0;

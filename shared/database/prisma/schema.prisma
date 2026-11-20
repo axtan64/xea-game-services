@@ -138,12 +138,20 @@ model CutcPlayerStats {
     litterPickedUp Int      @default(0)
     tilesCleaned   Int      @default(0)
     cashEarned     Float    @default(0)
+    // Also ever: players and passers-by pushed over, props knocked over by vehicle or kicked, and Robux spent
+    peoplePushed   Int      @default(0)
+    propsToppled   Int      @default(0)
+    robuxSpent     Int      @default(0)
     // The cosmetics worn: { [slot]: cosmeticId }
     cosmetics      Json     @default("{}")
     // The player's own contracts, every six hours, and the daily streak: { period, tasks, progress, streak, lastDay, best }
     dailies        Json     @default("{}")
     // Things the player has seen once, so they stop being pointed out (the shop's dot): { [thingId]: true }
     seen           Json     @default("{}")
+    // The colour the player picked with the Style Pass, six hex digits, or "" for their theme's
+    playerColor    String   @default("")
+    // The explosives bought (or given) and not used yet, kept for good: { [explosiveId]: count }
+    explosives     Json     @default("{}")
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 
@@ -170,6 +178,9 @@ model CutcSaveSlot {
     // The play time at which the city met its last Depot milestone, for the lobby's fastest cities; null until
     // then, and for a city where an admin skipped one
     finishedIn   Int?
+    // Whether anyone bought a developer product for the city (cash, a cash boost, explosives) before it met its
+    // last milestone: the fastest board lists such cities apart from those that bought nothing
+    boughtProducts Boolean @default(false)
     lastPlayedAt DateTime?
     // The session lock: the server playing the slot, and when it last said so (saves and heartbeats refresh it)
     lockId       String?
@@ -192,6 +203,7 @@ model CutcSaveSlot {
     @@unique([ownerId, slot])
     @@index([cleanShare])
     @@index([finishedIn])
+    @@index([boughtProducts, finishedIn])
 }
 
 // Who may join a Clean Up The City save slot besides its owner. Kept apart from CutcSaveSlot so wiping a slot
