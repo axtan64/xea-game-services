@@ -51,6 +51,18 @@ function createPlayerStatsModel(prismaModelName, fields) {
             return delegate().update({ where: { robloxId: BigInt(robloxId) }, data: stats });
         }
 
+        // Changes fields without moving updatedAt, so it still says when the game last saved the player: the
+        // dashboard tells by it whether a live server is holding their stats (and would write its own back). Null
+        // for a player with no stats
+        static async updateQuietly(robloxId, data) {
+            const stats = sanitize(data);
+            const id = BigInt(robloxId);
+            const current = await delegate().findUnique({ where: { robloxId: id }, select: { updatedAt: true } });
+            if (!current) return null;
+
+            return delegate().update({ where: { robloxId: id }, data: { ...stats, updatedAt: current.updatedAt } });
+        }
+
         static delete(robloxId) {
             return delegate().delete({ where: { robloxId: BigInt(robloxId) } });
         }

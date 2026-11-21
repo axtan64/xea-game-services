@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useApi } from '../api.js';
-import { Badge, ErrorText, Loading, PageHead, Person } from '../components.jsx';
+import { Badge, ErrorText, JoinButton, Loading, PageHead, Person } from '../components.jsx';
 import { useGame } from '../games.jsx';
 import { dateTime, duration, money, percent, timeAgo } from '../format.js';
 
@@ -29,8 +29,10 @@ export default function Cities() {
                 <>
                     <p className="muted">
                         Every city being played now, as its server last said with a save or heartbeat. Refreshes every
-                        30 seconds. Admins join any of them with <span className="mono">/join username</span>.
+                        30 seconds. Join starts Roblox in the lobby, which sends you on into the city as an invite does;
+                        in the game, admins join any of them with <span className="mono">/join username</span>.
                     </p>
+                    {!data.canJoin && <p className="hint muted">Join buttons need the game's universe ID: set it on the Games page.</p>}
                     {data.cities.length === 0 ? <p className="muted">Nobody is playing a city.</p> : (
                         <div className="city-list">
                             {data.cities.map((city) => (
@@ -40,6 +42,7 @@ export default function Cities() {
                                         <span className="grow" />
                                         <Badge tone="green">{city.playerCount} / {city.maxPlayers}</Badge>
                                         {city.ownerPresent ? <Badge tone="blurple">Owner in</Badge> : <Badge>Owner away</Badge>}
+                                        <JoinButton url={city.joinUrl} title="Starts Roblox in the lobby, which sends you on into this city as an invite does" />
                                     </div>
                                     <div className="city-facts">
                                         <span>{percent(city.cleanShare)} clean</span>

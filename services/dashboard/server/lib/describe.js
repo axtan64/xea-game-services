@@ -1,4 +1,5 @@
 const { LIVE_WITHIN_MS } = require('./games');
+const { describeEffect } = require('./holdings');
 
 const NO_PROFILE = (userId) => ({ userId, name: null, username: null, picture: null });
 
@@ -48,8 +49,8 @@ function purchasePeople(purchases) {
     return purchases.flatMap((purchase) => [purchase.user?.robloxId, purchase.recipient?.robloxId]).filter((id) => id != null).map(String);
 }
 
-// A purchase for the log: who bought it and, if someone else, for whom. One with no receipt and no price was
-// given, by an admin's command or the dashboard
+// A purchase for the log: who bought it and, if someone else, for whom, and what it gave (lib/holdings). One with
+// no receipt and no price was given, by an admin's command, the game's owner or the dashboard
 function describePurchase(purchase, people) {
     const buyerId = purchase.user ? String(purchase.user.robloxId) : null;
     const recipientId = purchase.recipient ? String(purchase.recipient.robloxId) : buyerId;
@@ -60,9 +61,11 @@ function describePurchase(purchase, people) {
         game: purchase.game?.slug ?? null,
         productId: String(purchase.productId),
         productType: purchase.productType,
-        productKey: purchase.metadata?.productKey ?? null,
+        productKey: purchase.metadata?.productKey ?? purchase.metadata?.gift
+            ?? (purchase.metadata?.explosive ? `${purchase.metadata.explosive} x${purchase.metadata.count}` : null),
         priceRobux: purchase.priceRobux,
         isGrant: purchase.robloxReceiptId == null && purchase.priceRobux === 0,
+        gave: describeEffect(purchase),
         buyer: buyerId ? people[buyerId] ?? NO_PROFILE(buyerId) : null,
         recipient: recipientId && recipientId !== buyerId ? people[recipientId] ?? NO_PROFILE(recipientId) : null,
         metadata: purchase.metadata ?? null,

@@ -26,6 +26,13 @@ export function Badge({ tone = 'grey', children }) {
     return <span className={`badge ${tone}`}>{children}</span>;
 }
 
+// Starts Roblox in the game's lobby with launch data naming a city or a player, which the lobby sends the clicker
+// on to (server/lib/joinLinks.js). Nothing when there's no link
+export function JoinButton({ url, label = 'Join', title }) {
+    if (!url) return null;
+    return <a className="button small green" href={url} target="_blank" rel="noreferrer" title={title}>{label} ↗</a>;
+}
+
 export function Stat({ label, value, sub }) {
     return (
         <div className="stat">

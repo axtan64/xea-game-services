@@ -4,7 +4,8 @@ import { Badge, ErrorText, Loading, PageHead, Person, Stat } from '../components
 import { useGame } from '../games.jsx';
 import { dateTime, number, robux, timeAgo } from '../format.js';
 
-export function PurchaseTable({ purchases, showGame = false }) {
+// The purchase log. With `onDelete`, each row has a Delete button that hands its purchase to it
+export function PurchaseTable({ purchases, showGame = false, onDelete, busy = false }) {
     if (purchases.length === 0) return <p className="muted">No purchases yet.</p>;
 
     return (
@@ -18,6 +19,7 @@ export function PurchaseTable({ purchases, showGame = false }) {
                         <th>Product</th>
                         {showGame ? <th>Game</th> : null}
                         <th className="right">Price</th>
+                        {onDelete ? <th /> : null}
                     </tr>
                 </thead>
                 <tbody>
@@ -34,6 +36,11 @@ export function PurchaseTable({ purchases, showGame = false }) {
                             <td className="right">
                                 {purchase.isGrant ? <Badge tone="blurple">Given</Badge> : robux(purchase.priceRobux)}
                             </td>
+                            {onDelete ? (
+                                <td className="right">
+                                    <button className="button small" disabled={busy} onClick={() => onDelete(purchase)}>Delete…</button>
+                                </td>
+                            ) : null}
                         </tr>
                     ))}
                 </tbody>

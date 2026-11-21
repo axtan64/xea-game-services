@@ -4,7 +4,9 @@ const { audit } = require('../lib/audit');
 const { PublishError, accountChanged, productGranted, tellLiveServers } = require('../lib/communication');
 const { describeMembership, describePurchase, describeSlot, purchasePeople } = require('../lib/describe');
 const { LIVE_WITHIN_MS } = require('../lib/games');
-const { findGrantable, grantable } = require('../lib/products');
+const holdings = require('../lib/holdings');
+const joinLinks = require('../lib/joinLinks');
+const { explosives, findGrantable, grantable } = require('../lib/products');
 const { findUserIdByUsername, getProfiles, isUserId } = require('../lib/roblox');
 const robloxBans = require('../lib/robloxBans');
 
@@ -84,9 +86,13 @@ playersRouter.get('/:userId', async (req, res) => {
     ]);
 
     const playingOwner = playing ? String(playing.ownerId) : null;
-    const people = await getProfiles([userId, ...purchasePeople(purchases), ...(playingOwner ? [playingOwner] : [])]);
+    const [people, links] = await Promise.all([
+        getProfiles([userId, ...purchasePeople(purchases), ...(playingOwner ? [playingOwner] : [])]),
+        hasCities ? joinLinks.forGame(game) : null,
+    ]);
     const owned = stats?.ownedProducts ?? {};
     const known = grantable(game.slug);
+    const keepsExplosives = Boolean(statsModel) && STATS_MODELS_BY_SLUG[game.slug].fields.includes('explosives');
 
     res.json({
         profile: people[userId],
@@ -95,17 +101,27 @@ playersRouter.get('/:userId', async (req, res) => {
         stats,
         products: known.map((product) => ({ ...product, owned: owned[product.key] === true })),
         otherProducts: Object.keys(owned).filter((key) => owned[key] && !known.some((product) => product.key === key)),
+        explosives: keepsExplosives ? holdings.describeStock(explosives(game.slug), stats?.explosives) : null,
+        // Whether a live server probably holds their stats, so their explosives can't be changed now
+        isPlaying: holdings.isPlaying(stats),
         hasCities,
+        // Join links (lib/joinLinks), null when the game's universe ID isn't set or Roblox won't say its start place
+        canJoin: Boolean(links),
+        followUrl: links ? links.follow(userId) : null,
         slots: slots.map((slot) => {
             const sharing = access.find((entry) => entry.slot === slot.slot);
+            const described = describeSlot(slot);
             return {
-                ...describeSlot(slot),
+                ...described,
                 access: sharing?.access ?? 'Friends',
                 allowAway: sharing?.allowAway ?? false,
                 members: Array.isArray(sharing?.members) ? sharing.members.length : 0,
+                joinUrl: links && described.isLive ? links.city(userId, slot.slot) : null,
             };
         }),
-        playing: playing ? { ownerId: playingOwner, slot: playing.slot, owner: people[playingOwner] } : null,
+        playing: playing
+            ? { ownerId: playingOwner, slot: playing.slot, owner: people[playingOwner], joinUrl: links ? links.city(playingOwner, playing.slot) : null }
+            : null,
         purchases: purchases.map((purchase) => describePurchase(purchase, people)),
     });
 });
@@ -231,8 +247,9 @@ playersRouter.post('/:userId/products', async (req, res) => {
     res.json({ ok: true, ...(await tellLiveServers(() => productGranted(game, userId, product.key))) });
 });
 
-// Takes back a pass given through ownedProducts. It goes when they next join; one bought on Roblox stays theirs,
-// since the game asks Roblox too
+// Takes back a pass given through ownedProducts (a gift, a grant, the owner's free gift), whether or not it is
+// one the dashboard knows. It goes when they next join; one bought on Roblox stays theirs, since the game asks
+// Roblox too
 playersRouter.delete('/:userId/products/:key', async (req, res) => {
     const { game } = req;
     const { userId, key } = req.params;
@@ -241,14 +258,94 @@ playersRouter.delete('/:userId/products/:key', async (req, res) => {
     if (!statsEntry?.fields.includes('ownedProducts'))
         return res.status(400).json({ error: `${game.name} keeps no owned products` });
 
-    const existing = await statsEntry.Model.get(userId);
-    const owned = { ...(existing?.ownedProducts ?? {}) };
-    if (!owned[key]) return res.status(404).json({ error: 'They don\'t have that' });
-
-    delete owned[key];
-    await statsEntry.Model.update(userId, { ownedProducts: owned });
+    if (!(await holdings.takePass(statsEntry.Model, userId, key))) return res.status(404).json({ error: 'They don\'t have that' });
     audit(req, 'revoke product', { game: game.slug, userId, productKey: key });
     res.json({ ok: true });
+});
+
+// Takes explosives out of their stock: `count` of them, or all if count is left out. Refused while a live server
+// probably holds their stats, since it would write its own count back within a minute
+playersRouter.delete('/:userId/explosives/:explosive', async (req, res) => {
+    const { game } = req;
+    const { userId, explosive } = req.params;
+    const count = req.body?.count ?? null;
+    const statsEntry = STATS_MODELS_BY_SLUG[game.slug];
+
+    if (!statsEntry?.fields.includes('explosives')) return res.status(400).json({ error: `${game.name} keeps no explosives` });
+    if (count !== null && !holdings.isCount(count))
+        return res.status(400).json({ error: `count must be a whole number from 1 to ${holdings.MOST_TAKEN}, or left out for all` });
+
+    const stats = await statsEntry.Model.get(userId);
+    if (holdings.isPlaying(stats)) return res.status(409).json({ error: holdings.PLAYING_ERROR });
+
+    const taken = await holdings.takeExplosives(statsEntry.Model, userId, explosive, count);
+    if (taken === 0) return res.status(404).json({ error: 'They have none of that' });
+    audit(req, 'take explosives', { game: game.slug, userId, explosive, taken });
+    res.json({ ok: true, taken });
+});
+
+// Deletes one of their purchase records (one they made, or one made for them). With `undo`, it also takes back
+// what the purchase gave, where the backend keeps it: a gift's or grant's pass from its recipient's ownedProducts,
+// or an explosive purchase's count from the buyer's stock (as many as are left). Nothing else can be undone here:
+// Robux aren't refunded, a pass bought on Roblox stays theirs, and cash or a boost bought for a city stays in it.
+// The record goes first, so a retry can't take back twice; if taking back then fails, the page says so, and the
+// pass or explosives can still be taken from their own cards
+playersRouter.delete('/:userId/purchases/:purchaseId', async (req, res) => {
+    const { game } = req;
+    const { userId, purchaseId } = req.params;
+    const undo = req.body?.undo === true;
+
+    const purchase = purchaseId.length <= 64 ? await Purchase.getWithPeople(purchaseId) : null;
+    const buyerId = purchase?.user ? String(purchase.user.robloxId) : null;
+    const recipientId = purchase?.recipient ? String(purchase.recipient.robloxId) : buyerId;
+    if (!purchase || purchase.gameId !== game.id || (buyerId !== userId && recipientId !== userId))
+        return res.status(404).json({ error: 'They have no such purchase' });
+
+    const effect = holdings.describeEffect(purchase);
+    const statsEntry = STATS_MODELS_BY_SLUG[game.slug];
+    const field = effect.kind === 'pass' ? 'ownedProducts' : 'explosives';
+    if (undo) {
+        if (!effect.undoable) return res.status(400).json({ error: 'Deleting this record can\'t take back what it gave' });
+        if (!statsEntry?.fields.includes(field)) return res.status(400).json({ error: `${game.name} keeps no ${field}` });
+        if (effect.kind === 'explosive' && holdings.isPlaying(await statsEntry.Model.get(recipientId)))
+            return res.status(409).json({ error: holdings.PLAYING_ERROR });
+    }
+
+    if (!(await Purchase.remove(purchase.id))) return res.status(404).json({ error: 'That purchase was already deleted' });
+
+    // Everything the record held, so the audit log can tell what was deleted
+    const record = {
+        game: game.slug,
+        userId,
+        purchaseId: purchase.id,
+        productId: String(purchase.productId),
+        productType: purchase.productType,
+        priceRobux: purchase.priceRobux,
+        robloxReceiptId: purchase.robloxReceiptId,
+        purchasedAt: purchase.purchasedAt,
+        buyerId,
+        recipientId,
+        metadata: purchase.metadata,
+        undo,
+    };
+
+    let tookBack = null;
+    if (undo) {
+        try {
+            tookBack = effect.kind === 'pass'
+                ? { pass: effect.passKey, had: await holdings.takePass(statsEntry.Model, recipientId, effect.passKey) }
+                : { explosive: effect.explosive, taken: await holdings.takeExplosives(statsEntry.Model, recipientId, effect.explosive, effect.count) };
+        } catch (err) {
+            console.error(`Deleted purchase ${purchase.id}, but couldn't take back what it gave:`, err);
+            audit(req, 'delete purchase', { ...record, tookBack: 'failed' });
+            return res.status(500).json({
+                error: `The record is deleted, but taking back what it gave failed: take the ${effect.kind === 'pass' ? 'pass' : 'explosives'} from their card instead`,
+            });
+        }
+    }
+
+    audit(req, 'delete purchase', { ...record, tookBack });
+    res.json({ ok: true, tookBack });
 });
 
 module.exports = playersRouter;

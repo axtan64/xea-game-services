@@ -11,6 +11,16 @@ const GRANTABLE = {
         { key: 'InfiniteBoost', name: 'Infinite Turbo Boost', productId: '2096448273' },
         { key: 'DoubleLuck', name: '2x Luck', productId: '2093650311' },
         { key: 'GliderPass', name: 'Glider', productId: '2094376419' },
+        { key: 'InfiniteBag', name: 'Infinite Bag', productId: '2093668838' },
+    ],
+};
+
+// The explosives a player keeps in stock, by game slug: each `key` is an id in the player's explosives stat. For
+// Clean Up The City, client/ReplicatedStorage/Resources/Explosive/Explosives.luau
+const EXPLOSIVES = {
+    cutc: [
+        { key: 'Dynamite', name: 'Dynamite sticks' },
+        { key: 'Nuke', name: 'Nukes' },
     ],
 };
 
@@ -22,4 +32,12 @@ function findGrantable(slug, key) {
     return grantable(slug).find((product) => product.key === key) ?? null;
 }
 
-module.exports = { grantable, findGrantable };
+function explosives(slug) {
+    return EXPLOSIVES[slug] ?? [];
+}
+
+function findExplosive(slug, key) {
+    return explosives(slug).find((explosive) => explosive.key === key) ?? null;
+}
+
+module.exports = { grantable, findGrantable, explosives, findExplosive };

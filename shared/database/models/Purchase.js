@@ -32,6 +32,20 @@ class Purchase {
         });
     }
 
+    // One purchase with the Roblox IDs of who bought it and for whom: for the dashboard's delete
+    static getWithPeople(id) {
+        return getClient().purchase.findUnique({
+            where: { id },
+            include: { user: { select: { robloxId: true } }, recipient: { select: { robloxId: true } } },
+        });
+    }
+
+    // Deletes a purchase's record, and nothing it gave. False if it was already gone
+    static async remove(id) {
+        const { count } = await getClient().purchase.deleteMany({ where: { id } });
+        return count === 1;
+    }
+
     static findByUser(userId) {
         return getClient().purchase.findMany({
             where: { userId },
