@@ -32,6 +32,30 @@ async function findUserIdByUsername(username) {
     return id != null ? String(id) : null;
 }
 
+// Roblox's own user search, by the start of a username or display name: up to `limit` user IDs, most likely first.
+// Rate-limited by Roblox, so each keyword's answer is kept a while and a refusal answers nothing rather than failing
+const SEARCH_TTL_MS = 60 * 1000;
+const searches = new Map(); // lowercased keyword -> { at, userIds }
+
+async function searchUserIds(keyword, limit = 10) {
+    const key = keyword.toLowerCase();
+    const cached = searches.get(key);
+    if (cached && Date.now() - cached.at < SEARCH_TTL_MS) return cached.userIds.slice(0, limit);
+
+    try {
+        const data = await getJson(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(keyword)}&limit=10`);
+        if (!data) return [];
+
+        const userIds = (data.data ?? []).map((user) => String(user.id));
+        if (searches.size > 500) searches.clear();
+        searches.set(key, { at: Date.now(), userIds });
+        return userIds.slice(0, limit);
+    } catch (err) {
+        console.error('Roblox user search failed:', err);
+        return [];
+    }
+}
+
 // Fetches the profiles of up to BATCH users not in the cache
 async function fetchBatch(userIds) {
     const [users, avatars] = await Promise.all([
@@ -79,4 +103,4 @@ async function getProfiles(userIds) {
     return profiles;
 }
 
-module.exports = { isUserId, findUserIdByUsername, getProfiles };
+module.exports = { isUserId, findUserIdByUsername, searchUserIds, getProfiles };

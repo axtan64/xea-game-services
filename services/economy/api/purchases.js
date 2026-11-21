@@ -84,7 +84,10 @@ purchasesRouter.post('/', async (req, res) => {
             const { Model } = req.stats;
             const existing = await Model.get(effectiveRecipientId);
             const ownedProducts = { ...(existing?.ownedProducts ?? {}), [String(productKey)]: true };
-            await Model.upsert(effectiveRecipientId, { ownedProducts });
+            // Quietly where they have stats: updatedAt says when the game last saved them, which the dashboard reads
+            // as whether they're in the game
+            if (existing) await Model.updateQuietly(effectiveRecipientId, { ownedProducts });
+            else await Model.upsert(effectiveRecipientId, { ownedProducts });
         } catch (err) {
             console.error('Error granting ownership:', err);
             return res.status(500).json({ error: 'Purchase logged, but ownership grant failed - retry the whole request' });

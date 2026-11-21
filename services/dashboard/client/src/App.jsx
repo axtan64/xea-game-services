@@ -11,7 +11,9 @@ import Purchases from './pages/Purchases.jsx';
 import Games from './pages/Games.jsx';
 import Settings from './pages/Settings.jsx';
 import Shell from './Shell.jsx';
+import { Dots } from './components.jsx';
 import { GameProvider } from './games.jsx';
+import { ConfirmProvider, TooltipLayer } from './ui.jsx';
 
 export default function App() {
     const [me, setMe] = useState(null); // null = still loading
@@ -23,32 +25,45 @@ export default function App() {
             .catch(() => setMe({ authenticated: false }));
     }, []);
 
-    if (me === null) return <div className="loading">Loading…</div>;
+    if (me === null) {
+        return (
+            <div className="splash">
+                <img className="splash-logo" src="/xeadev.png" alt="" />
+                <Dots />
+            </div>
+        );
+    }
 
     if (!me.authenticated) {
         return (
-            <Routes>
-                <Route path="*" element={<Login />} />
-            </Routes>
+            <>
+                <Routes>
+                    <Route path="*" element={<Login />} />
+                </Routes>
+                <TooltipLayer />
+            </>
         );
     }
 
     return (
         <GameProvider>
-            <Shell profile={me}>
-                <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/announce" element={<Announce profile={me} />} />
-                    <Route path="/players" element={<Players />} />
-                    <Route path="/players/:userId" element={<PlayerDetail />} />
-                    <Route path="/moderation" element={<Moderation />} />
-                    <Route path="/cities" element={<Cities />} />
-                    <Route path="/purchases" element={<Purchases />} />
-                    <Route path="/games" element={<Games />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-            </Shell>
+            <ConfirmProvider>
+                <Shell profile={me}>
+                    <Routes>
+                        <Route path="/" element={<Home />} />
+                        <Route path="/announce" element={<Announce profile={me} />} />
+                        <Route path="/players" element={<Players />} />
+                        <Route path="/players/:userId" element={<PlayerDetail />} />
+                        <Route path="/moderation" element={<Moderation />} />
+                        <Route path="/cities" element={<Cities />} />
+                        <Route path="/purchases" element={<Purchases />} />
+                        <Route path="/games" element={<Games />} />
+                        <Route path="/settings" element={<Settings />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                </Shell>
+                <TooltipLayer />
+            </ConfirmProvider>
         </GameProvider>
     );
 }

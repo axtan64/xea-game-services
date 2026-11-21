@@ -34,3 +34,6 @@ export const dateTime = (date) => (date ? new Date(date).toLocaleString() : '—
 export const byteLength = (text) => new TextEncoder().encode(text).length;
 
 export const profileUrl = (userId) => `https://www.roblox.com/users/${userId}/profile`;
+
+// A day as Discord writes "Member since": Jan 5, 2025
+export const shortDate = (date) => (date ? new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—');

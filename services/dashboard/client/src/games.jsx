@@ -1,7 +1,7 @@
 import { createContext, useContext, useState } from 'react';
 import { useApi } from './api.js';
 
-// The game the per-game pages (announcements, players, moderation, cities) work on, picked in the sidebar and
+// The game the per-game pages (announcements, players, moderation, cities) work on, picked in the shell's rail and
 // remembered in this browser
 const GameContext = createContext(null);
 const STORAGE_KEY = 'dashboard.game';
@@ -42,16 +42,7 @@ export function GameProvider({ children }) {
 
 export const useGame = () => useContext(GameContext);
 
-export function GamePicker() {
-    const { games, game, choose } = useGame();
-    if (games.length === 0) return null;
-
-    return (
-        <label className="game-picker">
-            <span className="field-label">Game</span>
-            <select className="input" value={game?.slug ?? ''} onChange={(e) => choose(e.target.value)}>
-                {games.map((entry) => <option key={entry.slug} value={entry.slug}>{entry.name}</option>)}
-            </select>
-        </label>
-    );
+// A game's initials, as Discord names a server without an icon: "Clean Up The City" is CUTC
+export function acronym(name = '') {
+    return name.split(/\s+/).filter(Boolean).map((word) => word[0]).join('').slice(0, 5).toUpperCase() || '?';
 }

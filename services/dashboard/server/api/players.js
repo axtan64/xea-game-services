@@ -7,7 +7,7 @@ const { LIVE_WITHIN_MS } = require('../lib/games');
 const holdings = require('../lib/holdings');
 const joinLinks = require('../lib/joinLinks');
 const { explosives, findGrantable, grantable } = require('../lib/products');
-const { findUserIdByUsername, getProfiles, isUserId } = require('../lib/roblox');
+const { findUserIdByUsername, getProfiles, isUserId, searchUserIds } = require('../lib/roblox');
 const robloxBans = require('../lib/robloxBans');
 
 const playersRouter = Router({ mergeParams: true });
@@ -16,8 +16,12 @@ const playersRouter = Router({ mergeParams: true });
 const MAX_REASON = 200;
 const MOST_BAN_DAYS = 3650;
 const DAY_MS = 24 * 60 * 60 * 1000;
-// Games whose players have save slots (Clean Up The City's cities)
+// Games whose players have save slots (Clean Up The City's cities), and whose servers save every player's stats
+// each minute, so the dashboard can tell who is in the game (lib/holdings isPlaying)
 const HAS_CITIES = new Set(['cutc']);
+// How many players the search box previews
+const MOST_SEARCH_RESULTS = 6;
+const USERNAME = /^[A-Za-z0-9_]{3,20}$/;
 
 // Prisma's "no such row", which GameMembership throws for a player with no membership to change
 const isNotFound = (err) => err?.code === 'P2025';
@@ -45,7 +49,7 @@ async function readStanding(game, userId, membership) {
 
 // Every route under /:userId needs a real user ID
 playersRouter.use('/:userId', (req, res, next) => {
-    if (req.params.userId === 'find') return next();
+    if (req.params.userId === 'find' || req.params.userId === 'search') return next();
     if (!isUserId(req.params.userId)) return res.status(400).json({ error: 'That isn\'t a Roblox user ID' });
     next();
 });
@@ -58,13 +62,61 @@ playersRouter.get('/find', async (req, res) => {
     if (isUserId(query)) return res.json({ userId: query });
 
     const username = query.replace(/^@/, '');
-    if (!/^[A-Za-z0-9_]{3,20}$/.test(username))
+    if (!USERNAME.test(username))
         return res.status(400).json({ error: 'That isn\'t a Roblox username or user ID' });
 
     const userId = await findUserIdByUsername(username);
     if (!userId) return res.status(404).json({ error: `Nobody on Roblox is called "${username}"` });
 
     res.json({ userId });
+});
+
+// The players a search box's text may mean, for its preview as it's typed: the exact one first (an ID, or a whole
+// username), then the closest names from Roblox's own search. Each says whether they have played this game and, for
+// a game that saves every player each minute, whether they're in it now. Never refuses: text that can't be a
+// username or ID previews nobody
+playersRouter.get('/search', async (req, res) => {
+    const { game } = req;
+    const query = String(req.query.q ?? '').trim();
+    const statsModel = STATS_MODELS_BY_SLUG[game.slug]?.Model;
+    const username = query.replace(/^@/, '');
+
+    let userIds = [];
+    if (isUserId(query)) {
+        userIds = [query];
+    } else if (USERNAME.test(username)) {
+        const [exact, similar] = await Promise.all([
+            findUserIdByUsername(username).catch(() => null),
+            searchUserIds(username),
+        ]);
+        userIds = [...new Set([exact, ...similar].filter(Boolean))].slice(0, MOST_SEARCH_RESULTS);
+    }
+    if (userIds.length === 0) return res.json({ results: [] });
+
+    const knowsPresence = HAS_CITIES.has(game.slug);
+    const [people, stats, liveCities] = await Promise.all([
+        getProfiles(userIds),
+        Promise.all(userIds.map((userId) => (statsModel ? statsModel.get(userId) : null))),
+        knowsPresence ? CutcSaveSlot.live(LIVE_WITHIN_MS) : [],
+    ]);
+    // Who the live cities' servers say are in them, as the player page counts them in the game too
+    const inCities = new Set(liveCities.flatMap((city) => (Array.isArray(city.players) ? city.players.map(String) : [])));
+
+    res.json({
+        results: userIds
+            // Roblox names nobody for an ID no account has
+            .filter((userId) => people[userId]?.username)
+            .map((userId) => {
+                const index = userIds.indexOf(userId);
+                return {
+                    profile: people[userId],
+                    isExact: people[userId].username.toLowerCase() === username.toLowerCase() || userId === query,
+                    hasPlayed: Boolean(stats[index]),
+                    inGame: knowsPresence ? holdings.isPlaying(stats[index]) || inCities.has(userId) : null,
+                    lastSeenAt: stats[index]?.updatedAt ?? null,
+                };
+            }),
+    });
 });
 
 // Everything the dashboard knows of a player in this game: their profile, standing, stats, passes, save slots,
@@ -93,6 +145,9 @@ playersRouter.get('/:userId', async (req, res) => {
     const owned = stats?.ownedProducts ?? {};
     const known = grantable(game.slug);
     const keepsExplosives = Boolean(statsModel) && STATS_MODELS_BY_SLUG[game.slug].fields.includes('explosives');
+    // In the game: their server saved them lately, or a city's server says they're in it. Only known for a game whose
+    // servers save every player each minute
+    const inGame = hasCities ? holdings.isPlaying(stats) || Boolean(playing) : null;
 
     res.json({
         profile: people[userId],
@@ -104,10 +159,13 @@ playersRouter.get('/:userId', async (req, res) => {
         explosives: keepsExplosives ? holdings.describeStock(explosives(game.slug), stats?.explosives) : null,
         // Whether a live server probably holds their stats, so their explosives can't be changed now
         isPlaying: holdings.isPlaying(stats),
+        // { inGame, inCity, lastSeenAt }, or null for a game that can't tell
+        presence: inGame === null ? null : { inGame, inCity: Boolean(playing), lastSeenAt: stats?.updatedAt ?? null },
         hasCities,
-        // Join links (lib/joinLinks), null when the game's universe ID isn't set or Roblox won't say its start place
+        // Join links (lib/joinLinks), null when the game's universe ID isn't set or Roblox won't say its start place.
+        // Following a player is only offered while they're in the game
         canJoin: Boolean(links),
-        followUrl: links ? links.follow(userId) : null,
+        followUrl: links && inGame ? links.follow(userId) : null,
         slots: slots.map((slot) => {
             const sharing = access.find((entry) => entry.slot === slot.slot);
             const described = describeSlot(slot);
@@ -232,7 +290,10 @@ playersRouter.post('/:userId/products', async (req, res) => {
     if (owned[product.key]) return res.status(409).json({ error: `They already have ${product.name}` });
 
     const recipient = await User.getOrCreateByRobloxId(userId);
-    await statsEntry.Model.upsert(userId, { ownedProducts: { ...owned, [product.key]: true } });
+    // Quietly where they have stats, so a grant doesn't look like their server saving them (lib/holdings isPlaying)
+    const ownedProducts = { ...owned, [product.key]: true };
+    if (existing) await statsEntry.Model.updateQuietly(userId, { ownedProducts });
+    else await statsEntry.Model.upsert(userId, { ownedProducts });
     await Purchase.create({
         gameId: game.id,
         userId: recipient.id,

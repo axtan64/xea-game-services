@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { api } from '../api.js';
-import { MessagingWarning, Notice, PageHead } from '../components.jsx';
+import { GameTopic, MessagingWarning, Notice, Page, SectionTitle } from '../components.jsx';
 import { useGame } from '../games.jsx';
+import { Icon } from '../icons.jsx';
+import { useConfirm } from '../ui.jsx';
 import { byteLength, timeAgo } from '../format.js';
 
 // The game clips anything longer (Services/Admin/Notices' MAX_TEXT, in bytes)
@@ -15,12 +17,12 @@ function BannerPreview({ message, fromTeam, profile }) {
         <div className="banner-preview">
             <div className="banner-ribbon">📣 DEVELOPER ANNOUNCEMENT <span className="banner-scope">GLOBAL</span></div>
             <div className="banner-body">
-                {fromTeam && <div className="avatar avatar-fallback">🏙️</div>}
+                {fromTeam && <div className="banner-avatar">🏙️</div>}
                 {!fromTeam && (profile?.picture
-                    ? <img className="avatar" src={profile.picture} alt="" />
-                    : <div className="avatar avatar-fallback">{name[0]}</div>)}
+                    ? <img className="banner-avatar" src={profile.picture} alt="" />
+                    : <div className="banner-avatar">{name[0]}</div>)}
                 <div className="banner-text">
-                    <div className="banner-sender">{name} <span className="badge purple">DEVELOPER</span></div>
+                    <div className="banner-sender">{name} <span className="banner-tag">DEVELOPER</span></div>
                     <div className="banner-message">{message || <span className="muted">Your announcement</span>}</div>
                 </div>
             </div>
@@ -38,13 +40,19 @@ export default function Announce({ profile }) {
     const [restartStatus, setRestartStatus] = useState(null);
     const [restarting, setRestarting] = useState(false);
     const bytes = byteLength(message.trim());
+    const confirm = useConfirm();
 
     // Every live server saves and moves its players on to a fresh one (Systems/Shutdown/SoftRestarting in the game)
     async function restart() {
         if (!game) return;
-        const question = `Soft restart every live server of ${game.name}? Everyone is teleported to a fresh server `
-            + 'running the latest published version: cities save first and their players arrive in the same city.';
-        if (!window.confirm(question)) return;
+        const asked = await confirm({
+            title: 'Soft restart every server',
+            body: `Every live server of ${game.name} saves, and everyone is teleported to a fresh server running the latest `
+                + 'published version: a city\'s players arrive in the same city.',
+            confirmLabel: 'Restart every server',
+            danger: true,
+        });
+        if (!asked) return;
 
         setRestarting(true);
         try {
@@ -60,7 +68,12 @@ export default function Announce({ profile }) {
     async function send(e) {
         e.preventDefault();
         if (!game || !message.trim() || bytes > MAX_BYTES) return;
-        if (!window.confirm(`Show this to everyone in every live server of ${game.name}?`)) return;
+        const asked = await confirm({
+            title: 'Send this announcement',
+            body: `Show it to everyone in every live server of ${game.name}? It can't be taken back once sent.`,
+            confirmLabel: 'Send',
+        });
+        if (!asked) return;
 
         setSending(true);
         try {
@@ -76,11 +89,10 @@ export default function Announce({ profile }) {
     }
 
     return (
-        <div className="page">
-            <PageHead title="Announce" />
-            <p className="muted">
+        <Page title="Announce" icon="megaphone" topic={<GameTopic />}>
+            <p className="lead">
                 A banner across the top of every player's screen in every live server of {game?.name ?? 'the game'},
-                with a chime, as <span className="mono">/announce global</span> shows it. It isn't kept: players who
+                with a chime, as <span className="code">/announce global</span> shows it. It isn't kept: players who
                 join later don't see it.
             </p>
             <MessagingWarning />
@@ -100,19 +112,25 @@ export default function Announce({ profile }) {
 
                 <div className="field">
                     <span className="field-label">From</span>
-                    <label className="check">
-                        <input type="radio" checked={!fromTeam} onChange={() => setFromTeam(false)} />
-                        Me: my headshot and name
-                    </label>
-                    <label className="check">
-                        <input type="radio" checked={fromTeam} onChange={() => setFromTeam(true)} />
-                        The developers: the game's icon
-                    </label>
+                    <div className="radio-group" role="radiogroup">
+                        <label className={`radio ${!fromTeam ? 'checked' : ''}`}>
+                            <input type="radio" name="from" checked={!fromTeam} onChange={() => setFromTeam(false)} />
+                            <span>Me<span className="radio-sub">My headshot and name</span></span>
+                        </label>
+                        <label className={`radio ${fromTeam ? 'checked' : ''}`}>
+                            <input type="radio" name="from" checked={fromTeam} onChange={() => setFromTeam(true)} />
+                            <span>The developers<span className="radio-sub">The game's icon</span></span>
+                        </label>
+                    </div>
                 </div>
 
-                <BannerPreview message={message.trim()} fromTeam={fromTeam} profile={profile} />
+                <div className="field">
+                    <span className="field-label">Preview</span>
+                    <BannerPreview message={message.trim()} fromTeam={fromTeam} profile={profile} />
+                </div>
 
-                <button className="primary" type="submit" disabled={sending || !message.trim() || bytes > MAX_BYTES}>
+                <button className="button brand" type="submit" disabled={sending || !message.trim() || bytes > MAX_BYTES}>
+                    <Icon name="megaphone" size={16} />
                     {sending ? 'Sending…' : 'Send to every server'}
                 </button>
             </form>
@@ -120,29 +138,34 @@ export default function Announce({ profile }) {
 
             {sent.length > 0 && (
                 <>
-                    <div className="section-title">Sent from this page</div>
-                    <ul className="list">
-                        {sent.map((entry) => (
-                            <li key={entry.at.getTime()}>
-                                <span className="muted">{timeAgo(entry.at)} · {entry.game}</span>
-                                <div>{entry.message}</div>
-                            </li>
-                        ))}
-                    </ul>
+                    <SectionTitle>Sent from this page</SectionTitle>
+                    <div className="card">
+                        <ul className="list">
+                            {sent.map((entry) => (
+                                <li className="list-row sent" key={entry.at.getTime()}>
+                                    <span className="grow">{entry.message}</span>
+                                    <span className="muted nowrap">{timeAgo(entry.at)} · {entry.game}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 </>
             )}
 
-            <div className="section-title">Restart every server</div>
-            <p className="muted">
-                A soft restart: every live server of {game?.name ?? 'the game'} saves, shows its players the shutdown
-                screen and teleports them on to a fresh server running the latest published version. A city's players
-                arrive in the same city, the lobby's in a new lobby, each where they stood. Announce it a few minutes
-                ahead if you can.
-            </p>
-            <button className="button danger" type="button" disabled={restarting || !game} onClick={restart}>
-                {restarting ? 'Restarting…' : 'Soft restart every server'}
-            </button>
-            <Notice status={restartStatus} />
-        </div>
+            <SectionTitle>Restart every server</SectionTitle>
+            <div className="card">
+                <p className="hint">
+                    A soft restart: every live server of {game?.name ?? 'the game'} saves, shows its players the shutdown
+                    screen and teleports them on to a fresh server running the latest published version. A city's players
+                    arrive in the same city, the lobby's in a new lobby, each where they stood. Announce it a few minutes
+                    ahead if you can.
+                </p>
+                <button className="button danger" type="button" disabled={restarting || !game} onClick={restart}>
+                    <Icon name="refresh" size={16} />
+                    {restarting ? 'Restarting…' : 'Soft restart every server'}
+                </button>
+                <Notice status={restartStatus} />
+            </div>
+        </Page>
     );
 }

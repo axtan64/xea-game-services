@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Notice, Page } from '../components.jsx';
+import { Icon } from '../icons.jsx';
 
 export default function Settings() {
     const [settings, setSettings] = useState(null);
@@ -30,33 +32,34 @@ export default function Settings() {
     }
 
     return (
-        <div className="preview">
-            <div className="preview-head"><h1>Settings</h1></div>
-
-            <div className="section-pill">Roblox bot cookie</div>
-            {settings && (
-                <p className="muted">
-                    Current value: {settings.ROBLOX_BOT_COOKIE.set
-                        ? <span className="mono">{settings.ROBLOX_BOT_COOKIE.masked}</span>
-                        : 'not set'}
-                </p>
-            )}
-
-            <form onSubmit={rotate}>
-                <label className="field">
-                    <span className="field-label">New .ROBLOSECURITY cookie</span>
-                    <input
-                        className="input"
-                        type="password"
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        placeholder="_|WARNING:-DO-NOT-SHARE-THIS...."
-                    />
-                </label>
-                <button className="primary" type="submit">Rotate cookie</button>
-            </form>
-
-            {status && <p className={status.ok ? 'hint' : 'hint red-text'}>{status.message}</p>}
-        </div>
+        <Page title="Settings" icon="sliders" topic="Every game">
+            <div className="card">
+                <div className="card-title"><Icon name="key" />Roblox bot cookie</div>
+                {settings && (
+                    <p className="hint">
+                        Current value: {settings.ROBLOX_BOT_COOKIE.set
+                            ? <span className="code">{settings.ROBLOX_BOT_COOKIE.masked}</span>
+                            : 'not set'}
+                    </p>
+                )}
+                <form className="form-stack" onSubmit={rotate}>
+                    <label className="field">
+                        <span className="field-label">New .ROBLOSECURITY cookie</span>
+                        <input
+                            className="input"
+                            type="password"
+                            value={draft}
+                            onChange={(e) => setDraft(e.target.value)}
+                            placeholder="_|WARNING:-DO-NOT-SHARE-THIS...."
+                            autoComplete="off"
+                        />
+                    </label>
+                    <div className="row-line">
+                        <button className="button brand" type="submit" disabled={!draft}>Rotate cookie</button>
+                    </div>
+                </form>
+                <Notice status={status} />
+            </div>
+        </Page>
     );
 }

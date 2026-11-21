@@ -2,10 +2,14 @@
 // grants), explosives in stock, and what a logged purchase gave. Robux are never refunded from here, and nothing
 // Roblox itself keeps (a game pass bought on Roblox) can be touched
 
-// A live server saves its players' stats every minute (Clean Up The City's AUTOSAVE_INTERVAL), writing back what it
-// holds of them: stats saved this recently are taken to be held by a server, which would undo a change to its own
-// saved stats (explosives). ownedProducts is never written back by the game, so it may change at any time
-const PLAYING_WITHIN_MS = 3 * 60 * 1000;
+const { LIVE_WITHIN_MS } = require('./games');
+
+// A live server saves each of its players' stats every minute, in the lobby and in cities alike (Clean Up The
+// City's AUTOSAVE_INTERVAL), writing back what it holds of them. Stats saved within a city lock's lifetime are taken
+// to mean the player is in a server now: the dashboard's presence dot, and the reason a change to stats the game
+// saves (explosives) is refused, since that server would write its own back. ownedProducts is never written back
+// by the game, so it may change at any time. The dashboard's own writes keep updatedAt (updateQuietly)
+const PLAYING_WITHIN_MS = LIVE_WITHIN_MS;
 
 // The most of an explosive one take may remove
 const MOST_TAKEN = 1000000;
@@ -16,8 +20,8 @@ function isPlaying(stats) {
     return Date.now() - new Date(stats.updatedAt).getTime() < PLAYING_WITHIN_MS;
 }
 
-const PLAYING_ERROR = 'They are playing, or were in the last few minutes: their server saves their explosives every '
-    + 'minute and would put them back. Try again once they have been gone a few minutes.';
+const PLAYING_ERROR = 'They are in the game, or were in the last few minutes: their server saves their explosives '
+    + 'every minute and would put them back. Try again once they have been gone a few minutes.';
 
 const isCount = (value) => Number.isInteger(value) && value > 0 && value <= MOST_TAKEN;
 
