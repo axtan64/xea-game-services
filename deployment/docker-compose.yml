@@ -104,6 +104,10 @@ services:
       - ROBLOX_BOT_COOKIE=${ROBLOX_BOT_COOKIE} # seed only - once set, the dashboard's Setting row in Postgres takes over
       - DATABASE_URL=postgresql://mining:mining@postgres:5432/mining
       - GROQ_API_KEY=${GROQ_API_KEY} # chat-memory /ask command
+      - ASK_MODEL=${ASK_MODEL:-} # optional: another Groq model for /ask (default qwen/qwen3.8-27b)
+      - ASK_FALLBACK_URL=${ASK_FALLBACK_URL:-} # optional: an OpenAI-compatible chat completions URL /ask tries when Groq is rate limited
+      - ASK_FALLBACK_API_KEY=${ASK_FALLBACK_API_KEY:-}
+      - ASK_FALLBACK_MODEL=${ASK_FALLBACK_MODEL:-}
     depends_on:
       - postgres
 

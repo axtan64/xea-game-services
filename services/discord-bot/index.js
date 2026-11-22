@@ -11,6 +11,7 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const Bot = require('./model/Bot.js');
 const { ping, ask, funds } = require('./commands/index.js');
 const { startFundsScheduler } = require('./lib/fundsScheduler.js');
+const { warmUp: warmUpMemories } = require('./lib/ask/memories.js');
 
 const bot = new Bot(TOKEN);
 
@@ -27,6 +28,9 @@ bot.onceReady(async () => {
         console.log('Bot status set successfully.');
 
         startFundsScheduler(bot.client);
+
+        // Load /ask's embedding model now rather than on the first question (it downloads on a fresh image)
+        warmUpMemories().catch((err) => console.error('Error loading /ask memories:', err));
     } catch (error) {
         console.error('Error deploying bot:', error);
         process.exit(1);

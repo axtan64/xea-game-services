@@ -588,6 +588,20 @@ button.search-icon:hover { color: var(--interactive-hover); }
 .facts { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; color: var(--muted); }
 .city-head { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
 
+/* Picking servers to restart */
+.pick-head { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+.pick-head .field-label { margin-bottom: 0; }
+.pick-list { margin: 8px 0 12px; }
+.pick-row { cursor: pointer; flex-wrap: wrap; gap: 8px 12px; }
+.pick-row.checked { background: var(--bg-modifier-selected); }
+.pick-row .person { min-width: 0; }
+.pick-lobby { flex: 1 1 0; }
+.pick-lobby .person-sub { white-space: normal; }
+.pick-heard { font-size: 14px; color: var(--muted); white-space: nowrap; }
+.picked-servers { margin: 0; padding-left: 20px; }
+.picked-servers li + li { margin-top: 4px; }
+.restart-actions { margin-top: 12px; }
+
 /* A sketch of the game's announcement banner */
 .banner-preview { border-radius: 4px; overflow: hidden; max-width: 560px; background: #1d2029; border: 2px solid #ffc83d; }
 .banner-ribbon { background: #ffc83d; color: #1b1d22; font-weight: 800; font-size: 12px; letter-spacing: 0.04em; padding: 6px 12px; display: flex; gap: 10px; }

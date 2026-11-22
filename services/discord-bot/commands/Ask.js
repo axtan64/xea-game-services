@@ -1,54 +1,46 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const Command = require('../model/Command.js');
 
-const path = require("path");
-const { pipeline } = require("@xenova/transformers");
-const Database = require("better-sqlite3");
-const sqliteVec = require("sqlite-vec");
+const { findMemories } = require('../lib/ask/memories.js');
+const { buildMessages, tidy } = require('../lib/ask/voice.js');
+const { complete, BusyError } = require('../lib/ask/models.js');
+const { clientEmojiIndex, renderEmoji } = require('../lib/ask/emojiText.js');
 
-const SYSTEM_PROMPT = `You are a Discord bot aimed at answering questions based on its memory. You are an AI replica of a human called 'Xea', a British ROBLOX game developer, owner of PLS WAIT, who is also the creator of this bot, and you are aiming to replicate him as closely as possible. Try to keep your answer concise.
+const MAX_QUESTION = 300;
+const MAX_MESSAGE = 2000;   // Discord's limit
+const NO_PINGS = { parse: [] };
 
-You have access to the following memories, which are chunks of text from Discord messages. These are provided as context to the user's question, and so that you can phrase your answer in a way that is consistent with Xea's personality, grammar, capitalisation, sentence structure, and style of speaking. You should answer the user's question based on these memories. If there are none, just freestyle it.`;
-
-// Setup GROQ client
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-
-// Setup database client
-const PIPELINE = "feature-extraction";
-const MODEL_NAME = "Xenova/all-MiniLM-L6-v2";
-
-const db = new Database(path.resolve(__dirname, "../resources/memories.db"));
-
-sqliteVec.load(db);
-
-function getUserPrompt(question, memories) {
-    let userPrompt = "";
-
-    userPrompt += `\n\nUser's question: ${question}\n\n`;
-
-    userPrompt += `\n\nRelevant memories:\n`;
-
-    // Add up to 1,000 characters of memories to the prompt
-    let totalLength = 0;
-
-    for (const { text } of memories) {
-        const memoryText = `\n\nMemory: ${text}`;
-
-        if (totalLength + memoryText.length > 1000) break;
-
-        userPrompt += memoryText;
-
-        totalLength += memoryText.length;
+/**
+ * Splits text into Discord-sized messages at line breaks, else spaces, never inside an emoji's <:name:id>.
+ * @param {string} text
+ * @returns {string[]}
+ */
+function splitMessages(text) {
+    const parts = [];
+    let rest = text;
+    while (rest.length > MAX_MESSAGE) {
+        let cut = rest.lastIndexOf('\n', MAX_MESSAGE);
+        if (cut < MAX_MESSAGE / 2) cut = rest.lastIndexOf(' ', MAX_MESSAGE);
+        if (cut < MAX_MESSAGE / 2) {
+            const open = rest.lastIndexOf('<', MAX_MESSAGE);
+            cut = open > rest.lastIndexOf('>', MAX_MESSAGE) && open > 0 ? open : MAX_MESSAGE;
+        }
+        parts.push(rest.slice(0, cut).trimEnd());
+        rest = rest.slice(cut).trimStart();
     }
+    if (rest) parts.push(rest);
+    return parts;
+}
 
-    userPrompt += `\n\nYour answer:`;
-
-    return userPrompt;
+async function send(interaction, question, answer) {
+    const [first, ...more] = splitMessages(`**Question:** ${question}\n\n**Answer:** ${answer}`);
+    await interaction.editReply({ content: first, allowedMentions: NO_PINGS });
+    for (const content of more) await interaction.followUp({ content, allowedMentions: NO_PINGS });
 }
 
 /**
- * Given a question, the bot will search its memory for relevant information and provide an answer.
+ * Given a question, the bot answers as Xea: his memories closest to the question, his voice from
+ * resources/voice.json, and a free chat model (lib/ask/models.js).
  */
 const ask = new Command(
     new SlashCommandBuilder()
@@ -58,80 +50,40 @@ const ask = new Command(
             option.setName('question')
                 .setDescription('The question you want to ask the bot.')
                 .setRequired(true)
+                .setMaxLength(MAX_QUESTION)
         ),
     async (interaction) => {
-        await interaction.reply({ content: 'uhhh lemme have a think about that one (loading...)' });
+        const question = interaction.options.getString('question');
+
+        await interaction.reply({ content: 'uhhh lemme have a think about that one (loading...)', allowedMentions: NO_PINGS });
 
         // Interaction already replied to here, so use editReply to indicate failure (not reply/replyError)
         try {
-            const question = interaction.options.getString('question');
-
-            // Load the transformer model for feature extraction
-            const extractor = await pipeline(PIPELINE, MODEL_NAME);
-
-            // Embed the question
-            const questionEmbedding = await extractor(
+            const emoji = clientEmojiIndex(interaction.client);
+            const memories = await findMemories(question);
+            const messages = buildMessages({
                 question,
-                { pooling: "mean", normalize: true }
-            );
-
-            const questionVector = new Float32Array(questionEmbedding.data);
-
-            // Search the database for relevant memories
-            let results = [];
-            try {
-                results = db.prepare(`
-                    SELECT m.*, e.embedding
-                    FROM memory_embeddings e
-                    JOIN memories m
-                    ON m.id = e.rowid
-                    WHERE e.embedding MATCH ? AND k = 5
-                    ORDER BY e.distance
-                `).all(questionVector);
-            } catch (err) {
-                if (err.code !== 'SQLITE_ERROR') throw err;
-            }
-
-            const prompt = getUserPrompt(question, results);
-
-            // Generate a response using Groq's API
-            const groqResponse = await fetch(GROQ_API_URL, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${GROQ_API_KEY}`,
-                },
-                body: JSON.stringify({
-                    model: "openai/gpt-oss-120b",
-                    messages: [
-                        { role: "system", content: SYSTEM_PROMPT },
-                        { role: "user", content: prompt }
-                    ],
-                    reasoning_effort: "low",
-                    max_tokens: 400,
-                }),
+                asker: interaction.member?.displayName ?? interaction.user.displayName,
+                memories,
+                postable: new Set(emoji.keys()),
             });
 
-            const groqData = await groqResponse.json();
+            const reply = await complete(messages);
+            const answer = renderEmoji(tidy(reply.text), emoji) || 'uhhh';
 
-            if (!groqResponse.ok || !groqData.choices?.[0]?.message?.content) {
-                console.error('Groq API error:', groqResponse.status, groqData);
-                await interaction.editReply('sorry, the ai backend is misconfigured or unavailable right now (check GROQ_API_KEY).');
+            await send(interaction, question, answer);
+        } catch (error) {
+            if (error instanceof BusyError) {
+                await send(interaction, question, "too many people asking me stuff rn 😭\ntry again in a minute or two").catch(() => {});
                 return;
             }
 
-            const answer = groqData.choices[0].message.content.trim();
-
-            const response = `**Question:** ${question}\n\n**Answer:** ${answer}`;
-
-            await interaction.editReply(response);
-        } catch (error) {
             console.error('Error generating response:', error);
 
             await interaction.editReply('sorry i died while trying to answer your question. please try again later.').catch(() => {});
         }
     },
-    20000
+    5000
 );
 
 module.exports = ask;

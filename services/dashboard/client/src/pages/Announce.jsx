@@ -1,13 +1,201 @@
-import { useState } from 'react';
-import { api } from '../api.js';
-import { GameTopic, MessagingWarning, Notice, Page, SectionTitle } from '../components.jsx';
+import { useEffect, useState } from 'react';
+import { api, useApi } from '../api.js';
+import { Badge, ErrorText, GameTopic, IconButton, MessagingWarning, Notice, Page, Person, SectionTitle } from '../components.jsx';
 import { useGame } from '../games.jsx';
 import { Icon } from '../icons.jsx';
 import { useConfirm } from '../ui.jsx';
-import { byteLength, timeAgo } from '../format.js';
+import { byteLength, dateTime, timeAgo } from '../format.js';
 
 // The game clips anything longer (Services/Admin/Notices' MAX_TEXT, in bytes)
 const MAX_BYTES = 300;
+
+// The live cities are read again this often, as the Live cities page does
+const REFRESH_MS = 30 * 1000;
+
+const cityKey = (city) => `${city.ownerId}:${city.slot}`;
+const ownerName = (city) => city.owner?.name || city.owner?.username || city.ownerId;
+const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+
+// What a restart reached, in words
+function describeSent(result) {
+    if (result.everyServer) return 'Sent. Every live server moves its players on within a few seconds.';
+
+    const reached = [result.cities > 0 && plural(result.cities, 'city', 'cities'), result.lobbies && 'every lobby'].filter(Boolean);
+    const gone = result.gone?.length
+        ? ` ${plural(result.gone.length, 'picked city', 'picked cities')} had already closed and ${result.gone.length === 1 ? 'was' : 'were'} left out.`
+        : '';
+    return `Sent to ${reached.join(' and ')}. Each moves its players on within a few seconds.${gone}`;
+}
+
+// The servers a restart is about to reach, for the question before it
+function PickedServers({ cities, lobbies }) {
+    return (
+        <>
+            <p>
+                These save, show their players the shutdown screen and teleport them on to a fresh server running the latest
+                published version, a city's players to the same city:
+            </p>
+            <ul className="picked-servers">
+                {cities.map((city) => (
+                    <li key={cityKey(city)}>{ownerName(city)}'s city, slot {city.slot}: {plural(city.playerCount, 'player', 'players')}</li>
+                ))}
+                {lobbies && <li>Every lobby: their players hop to a fresh lobby</li>}
+            </ul>
+            <p className="hint">Every other server carries on.</p>
+        </>
+    );
+}
+
+// Soft restarts every live server, or (Clean Up The City) the cities and lobbies picked: each saves and moves its
+// players on to a fresh one (Systems/Shutdown/SoftRestarting in the game). Cities are picked one by one from the
+// live cities list. Lobbies go all together: nothing records them one by one, and a lobby's players hop back
+// through matchmaking, where only a restart of every lobby makes sure they land in a fresh one
+function RestartServers({ game }) {
+    const { data, error, reload } = useApi(game ? `/api/games/${game.slug}/cities` : null);
+    const [picked, setPicked] = useState(() => new Set());
+    const [lobbies, setLobbies] = useState(false);
+    const [status, setStatus] = useState(null);
+    const [restarting, setRestarting] = useState(false);
+    const confirm = useConfirm();
+
+    useEffect(() => {
+        const timer = setInterval(reload, REFRESH_MS);
+        return () => clearInterval(timer);
+    }, [reload]);
+
+    // Another game picked in the sidebar starts with nothing picked
+    useEffect(() => {
+        setPicked(new Set());
+        setLobbies(false);
+        setStatus(null);
+    }, [game?.slug]);
+
+    const canPick = Boolean(data?.supported);
+    const cities = canPick ? data.cities : [];
+    // A city that has left the list since it was picked is left out
+    const pickedCities = cities.filter((city) => picked.has(cityKey(city)));
+    const pickedCount = pickedCities.length + (lobbies ? 1 : 0);
+    const isEveryCityPicked = cities.length > 0 && pickedCities.length === cities.length;
+
+    function toggle(city) {
+        setPicked((current) => {
+            const next = new Set(current);
+            if (!next.delete(cityKey(city))) next.add(cityKey(city));
+            return next;
+        });
+    }
+
+    // `target` is { cities, lobbies } for the servers picked, or nothing for every server
+    async function restart(target) {
+        if (!game) return;
+        const asked = await confirm(target ? {
+            title: 'Soft restart the servers picked',
+            body: <PickedServers cities={pickedCities} lobbies={lobbies} />,
+            confirmLabel: 'Restart these',
+            danger: true,
+        } : {
+            title: 'Soft restart every server',
+            body: `Every live server of ${game.name} saves, and everyone is teleported to a fresh server running the latest `
+                + 'published version: a city\'s players arrive in the same city.',
+            confirmLabel: 'Restart every server',
+            danger: true,
+        });
+        if (!asked) return;
+
+        setRestarting(true);
+        try {
+            const result = await api(`/api/games/${game.slug}/restart`, { method: 'POST', body: target });
+            setStatus({ ok: true, message: describeSent(result) });
+            if (target) {
+                setPicked(new Set());
+                setLobbies(false);
+            }
+        } catch (err) {
+            setStatus({ ok: false, message: err.message });
+        } finally {
+            setRestarting(false);
+        }
+    }
+
+    const restartPicked = () => restart({
+        cities: pickedCities.map((city) => ({ ownerId: city.ownerId, slot: city.slot })),
+        lobbies,
+    });
+
+    return (
+        <>
+            <SectionTitle>Restart servers</SectionTitle>
+            <div className="card">
+                <p className="hint">
+                    A soft restart: a server saves, shows its players the shutdown screen and teleports them on to a fresh
+                    server running the latest published version. A city's players arrive in the same city, the lobby's in a
+                    new lobby, each where they stood. Announce it a few minutes ahead if you can.
+                </p>
+
+                {canPick && (
+                    <>
+                        <div className="pick-head">
+                            <span className="field-label">Pick servers</span>
+                            <span className="grow" />
+                            {cities.length > 0 && (
+                                <button
+                                    type="button"
+                                    className="button link small"
+                                    onClick={() => setPicked(isEveryCityPicked ? new Set() : new Set(cities.map(cityKey)))}
+                                >
+                                    {isEveryCityPicked ? 'Unpick every city' : 'Pick every city'}
+                                </button>
+                            )}
+                            <IconButton icon="refresh" tip="Refresh the cities" onClick={reload} />
+                        </div>
+                        <ErrorText error={error} />
+                        <ul className="list pick-list">
+                            <li>
+                                <label className={`list-row pick-row ${lobbies ? 'checked' : ''}`}>
+                                    <span className="check"><input type="checkbox" checked={lobbies} onChange={(e) => setLobbies(e.target.checked)} /></span>
+                                    <span className="avatar-wrap s32"><span className="avatar avatar-fallback"><Icon name="users" size={18} /></span></span>
+                                    <span className="person-names pick-lobby">
+                                        <span className="person-name">Every lobby</span>
+                                        <span className="person-sub">Their players hop to a fresh lobby. Lobbies restart all together</span>
+                                    </span>
+                                </label>
+                            </li>
+                            {cities.map((city) => {
+                                const isPicked = picked.has(cityKey(city));
+                                return (
+                                    <li key={cityKey(city)}>
+                                        <label className={`list-row pick-row ${isPicked ? 'checked' : ''}`}>
+                                            <span className="check"><input type="checkbox" checked={isPicked} onChange={() => toggle(city)} /></span>
+                                            <Person profile={city.owner} sub={`slot ${city.slot}`} plain status={city.ownerPresent ? 'online' : 'offline'} />
+                                            <span className="grow" />
+                                            <Badge tone="green">{city.playerCount} / {city.maxPlayers} playing</Badge>
+                                            <span className="pick-heard" data-tip={dateTime(city.lockedAt)}>heard from {timeAgo(city.lockedAt)}</span>
+                                        </label>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                        {cities.length === 0 && <p className="hint">Nobody is playing a city.</p>}
+                    </>
+                )}
+
+                <div className="row-line restart-actions">
+                    {canPick && (
+                        <button className="button danger" type="button" disabled={restarting || pickedCount === 0} onClick={restartPicked}>
+                            <Icon name="refresh" size={16} />
+                            {restarting ? 'Restarting…' : `Restart picked${pickedCount > 0 ? ` (${pickedCount})` : ''}`}
+                        </button>
+                    )}
+                    <button className="button danger" type="button" disabled={restarting || !game} onClick={() => restart()}>
+                        <Icon name="refresh" size={16} />
+                        {restarting ? 'Restarting…' : 'Soft restart every server'}
+                    </button>
+                </div>
+                <Notice status={status} />
+            </div>
+        </>
+    );
+}
 
 // A sketch of the in-game banner (Systems/UI/Announcement/AnnouncementBanner), so the words can be read as players will see them
 function BannerPreview({ message, fromTeam, profile }) {
@@ -37,33 +225,8 @@ export default function Announce({ profile }) {
     const [status, setStatus] = useState(null);
     const [sending, setSending] = useState(false);
     const [sent, setSent] = useState([]);
-    const [restartStatus, setRestartStatus] = useState(null);
-    const [restarting, setRestarting] = useState(false);
     const bytes = byteLength(message.trim());
     const confirm = useConfirm();
-
-    // Every live server saves and moves its players on to a fresh one (Systems/Shutdown/SoftRestarting in the game)
-    async function restart() {
-        if (!game) return;
-        const asked = await confirm({
-            title: 'Soft restart every server',
-            body: `Every live server of ${game.name} saves, and everyone is teleported to a fresh server running the latest `
-                + 'published version: a city\'s players arrive in the same city.',
-            confirmLabel: 'Restart every server',
-            danger: true,
-        });
-        if (!asked) return;
-
-        setRestarting(true);
-        try {
-            await api(`/api/games/${game.slug}/restart`, { method: 'POST' });
-            setRestartStatus({ ok: true, message: 'Sent. Every live server moves its players on within a few seconds.' });
-        } catch (err) {
-            setRestartStatus({ ok: false, message: err.message });
-        } finally {
-            setRestarting(false);
-        }
-    }
 
     async function send(e) {
         e.preventDefault();
@@ -152,20 +315,7 @@ export default function Announce({ profile }) {
                 </>
             )}
 
-            <SectionTitle>Restart every server</SectionTitle>
-            <div className="card">
-                <p className="hint">
-                    A soft restart: every live server of {game?.name ?? 'the game'} saves, shows its players the shutdown
-                    screen and teleports them on to a fresh server running the latest published version. A city's players
-                    arrive in the same city, the lobby's in a new lobby, each where they stood. Announce it a few minutes
-                    ahead if you can.
-                </p>
-                <button className="button danger" type="button" disabled={restarting || !game} onClick={restart}>
-                    <Icon name="refresh" size={16} />
-                    {restarting ? 'Restarting…' : 'Soft restart every server'}
-                </button>
-                <Notice status={restartStatus} />
-            </div>
+            <RestartServers game={game} />
         </Page>
     );
 }

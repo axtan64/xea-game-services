@@ -53,8 +53,10 @@ const productGranted = (game, recipientUserId, productKey) =>
 const accountChanged = (game, userId, kickReason) =>
     publish(game, '/account-changed', { userId: String(userId), ...(kickReason && { kickReason }) });
 
-// Tells every live server to soft restart: each saves and moves its players on to a fresh server
-const softRestart = (game, requestedBy) => publish(game, '/soft-restart', { requestedBy: String(requestedBy) });
+// Tells live servers to soft restart: each saves and moves its players on to a fresh server. Every server, or with
+// `targets` ({ jobIds?, lobbies? }) only the servers with those JobIds and, with `lobbies`, every lobby
+const softRestart = (game, requestedBy, targets = {}) =>
+    publish(game, '/soft-restart', { requestedBy: String(requestedBy), ...targets });
 
 // Runs a publish after a change already saved, answering how it went rather than throwing: the change stands
 // either way, and live servers only learn of it sooner

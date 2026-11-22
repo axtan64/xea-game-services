@@ -50,12 +50,54 @@ function publishAccountChanged(universeId, apiKey, userId, kickReason) {
     return publishMessage(universeId, apiKey, ACCOUNT_CHANGED_TOPIC, kickReason ? { userId, kickReason } : { userId });
 }
 
-// Must match Topics.SoftRestart on the Roblox side: every live server saves and moves its players on to a fresh
-// server (a city to a new server of the same city, the lobby to a new lobby), so they pick up the latest version
+// Must match Topics.SoftRestart on the Roblox side: a live server saves and moves its players on to a fresh server
+// (a city to a new server of the same city, the lobby to a new lobby), so they pick up the latest version. A message
+// naming no server is for every server; otherwise for the servers whose JobId is in `jobIds`, and with `lobbies`
+// for every lobby (Clean Up The City's Model/Shutdown/RestartOrder)
 const SOFT_RESTART_TOPIC = 'SOFT_RESTART';
 
-function publishSoftRestart(universeId, apiKey, requestedBy) {
-    return publishMessage(universeId, apiKey, SOFT_RESTART_TOPIC, requestedBy ? { requestedBy } : {});
+// The most JobIds one message names: each is 36 characters, 39 quoted with its comma, so 20 with requestedBy and
+// lobbies come to about 850 bytes, inside Roblox's 1 KB
+const JOB_IDS_PER_MESSAGE = 20;
+
+// The messages a soft restart takes: one for every server, or the named servers 20 to a message, the lobbies
+// named in the first
+function softRestartMessages({ requestedBy, jobIds, lobbies } = {}) {
+    const base = requestedBy ? { requestedBy } : {};
+    if (!jobIds?.length && !lobbies) return [base];
+
+    const messages = [];
+    for (let i = 0; i < (jobIds?.length ?? 0); i += JOB_IDS_PER_MESSAGE)
+        messages.push({ ...base, jobIds: jobIds.slice(i, i + JOB_IDS_PER_MESSAGE) });
+    if (lobbies) {
+        if (messages.length === 0) messages.push({ ...base });
+        messages[0].lobbies = true;
+    }
+    return messages;
 }
 
-module.exports = { publishAnnouncement, publishProductGrant, publishAccountChanged, publishSoftRestart, MAX_MESSAGE_BYTES };
+/**
+ * @param {{ requestedBy?: string, jobIds?: string[], lobbies?: boolean }} order Who asked, and which servers: none
+ *     named means every server
+ * @throws If a publish fails; the messages before it were sent, and the error says how many
+ */
+async function publishSoftRestart(universeId, apiKey, order) {
+    const messages = softRestartMessages(order);
+    for (const [index, message] of messages.entries()) {
+        try {
+            await publishMessage(universeId, apiKey, SOFT_RESTART_TOPIC, message);
+        } catch (err) {
+            if (index > 0) err.message = `${err.message} (${index} of ${messages.length} messages were sent first)`;
+            throw err;
+        }
+    }
+}
+
+module.exports = {
+    publishAnnouncement,
+    publishProductGrant,
+    publishAccountChanged,
+    publishSoftRestart,
+    softRestartMessages,
+    MAX_MESSAGE_BYTES,
+};
