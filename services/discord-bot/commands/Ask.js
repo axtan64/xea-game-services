@@ -2,11 +2,12 @@ const { SlashCommandBuilder } = require('discord.js');
 const Command = require('../model/Command.js');
 
 const { findMemories } = require('../lib/ask/memories.js');
-const { buildMessages, tidy } = require('../lib/ask/voice.js');
+const { buildMessages, tidy, copiedWords, rephraseMessages } = require('../lib/ask/voice.js');
 const { complete, BusyError } = require('../lib/ask/models.js');
 const { clientEmojiIndex, renderEmoji } = require('../lib/ask/emojiText.js');
 
 const MAX_QUESTION = 300;
+const COPY_LIMIT = 8;       // words in a row taken from one memory before a reply counts as copied
 const MAX_MESSAGE = 2000;   // Discord's limit
 const NO_PINGS = { parse: [] };
 
@@ -68,7 +69,15 @@ const ask = new Command(
                 postable: new Set(emoji.keys()),
             });
 
-            const reply = await complete(messages);
+            let reply = await complete(messages);
+
+            // A reply that lifts a long run of words from a memory gets one go at new words; the less copied wins
+            const copied = copiedWords(reply.text, memories);
+            if (copied >= COPY_LIMIT) {
+                const again = await complete(rephraseMessages(messages, reply.text)).catch(() => null);
+                if (again && copiedWords(again.text, memories) < copied) reply = again;
+            }
+
             const answer = renderEmoji(tidy(reply.text), emoji) || 'uhhh';
 
             await send(interaction, question, answer);

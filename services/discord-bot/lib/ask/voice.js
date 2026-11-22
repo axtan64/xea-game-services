@@ -104,4 +104,38 @@ function tidy(text) {
         .join('\n');
 }
 
-module.exports = { buildMessages, tidy };
+const REPHRASE = "that's basically copied from what you said before. say it again in completely new words, same meaning";
+
+function words(text) {
+    return text.toLowerCase().replace(/:\w+:/g, ' ').replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/).filter(Boolean);
+}
+
+/**
+ * @param {string} answer
+ * @param {{ text: string }[]} memories the memories the answer was written from
+ * @returns {number} the longest run of words the answer shares with any one memory
+ */
+function copiedWords(answer, memories) {
+    const said = words(answer);
+    const remembered = memories.map((m) => ` ${words(m.text).join(' ')} `);
+    let longest = 0;
+    for (let start = 0; start + longest < said.length; start++) {
+        for (let end = start + longest + 1; end <= said.length; end++) {
+            const run = ` ${said.slice(start, end).join(' ')} `;
+            if (!remembered.some((m) => m.includes(run))) break;
+            longest = end - start;
+        }
+    }
+    return longest;
+}
+
+/**
+ * The conversation again with the copied answer and a request to say it in new words.
+ * @param {{ role: string, content: string }[]} messages from buildMessages
+ * @param {string} answer the copied answer
+ */
+function rephraseMessages(messages, answer) {
+    return [...messages, { role: 'assistant', content: answer }, { role: 'user', content: REPHRASE }];
+}
+
+module.exports = { buildMessages, tidy, copiedWords, rephraseMessages };
