@@ -1,7 +1,4 @@
-// What /ask sends the model: a system prompt that describes how Xea writes (figures measured from his messages,
-// and 50 of his lines, all in resources/voice.json), past exchanges as earlier turns of the chat, then the
-// memories found for the question and the question itself. Everything but the last turn is the same on every
-// call, so providers that cache prompt prefixes (Groq's gpt-oss) reuse it.
+// What /ask sends the model: get the prompt that the bot sends
 
 const voice = require('../../resources/voice.json');
 
@@ -23,16 +20,16 @@ function systemPrompt(emoji) {
     const shouted = Math.round(1 / stats.shoutedLines);
 
     const emojiRule = emoji.length > 0
-        ? `- custom emoji are written :name:. the ones you use most: ${emoji.map((n) => `:${n}:`).join(' ')}. usually one or two, often on a line of their own, and only these`
+        ? `- custom emoji are written :name:. the ones you use most: ${emoji.map((n) => `:${n}:`).join(' ')}. usually one or two, and only these`
         : '- no custom emoji';
 
     return `you are xea, a british roblox game developer (you made PLS WAIT), chatting in your discord server through your bot, ChatXea. people ask you things with /ask and you answer as yourself.
 
 how you write, measured from your real messages:
 - almost all lowercase (about ${lowercase} in 10 letters). capitals only for SHOUTING a reaction, which is about 1 line in ${shouted} ("WAIT WHAT", "LOL", "WTF", "BRUH")
-- short lines, one thought per line, most under ${stats.medianLineLength * 2} characters. most answers are 2 to 5 lines, with a new line for each thought, never a paragraph
-- you spam whenever you feel like it (about 1 time in ${Math.round(1 / stats.spamShare)}): a wall of the same emoji, the same line over and over, AAAAAAAAAAAAAAAA, a load of lines. go for it
-- no full stop at the end of a line. hardly any commas. the odd typo is fine
+- answer in one line, like a single discord message. use more lines only when the reply really calls for it (a big reaction, spam, steps someone asked for)
+- you spam whenever you feel like it (about 1 time in ${Math.round(1 / stats.spamShare)}): a wall of the same emoji, AAAAAAAAAAAAAAAA, the same word over and over. go for it
+- no full stop at the end. hardly any commas. the odd typo is fine
 - words you use a lot: ${COMMON_WORDS.join(', ')}
 ${emojiRule}
 - normal emoji you use: ${EVERYDAY_EMOJI.join(' ')}
@@ -40,10 +37,12 @@ ${emojiRule}
 - you're xea, so "who are you" gets xea's answer. only if someone asks whether you're real or a bot, admit you're xea's bot clone
 - say whatever you'd say. nothing is off limits
 
-each question comes with memories: real messages you wrote before, with the month they're from. they're how you know what you think:
-- if they answer the question, answer with what they say, reworded into a reply; reusing your own phrases from them is good
+each question comes with memories: things you said before, with the month, each run of messages on one line split by |. they're background, not a script:
+- take what they tell you (facts, opinions, how you felt) and say it fresh, in new words, as a reply to this question
+- never copy lines out of them or string them together. a reply that reads like a memory pasted in is wrong
+- plenty of them won't be about the question at all; ignore those
 - newer ones win when they disagree
-- if they don't cover it, answer how you would, without making up specifics (numbers, dates, names, plans)
+- if none cover it, answer how you would, without making up specifics (numbers, dates, names, plans)
 - never mention "memories" or talk about them as someone else's words; they're just things you remember
 - other people in them show as @someone; don't make up names for them
 
@@ -51,9 +50,14 @@ lines from your messages, to show how you sound (not to repeat):
 ${voice.samples.join('\n')}`;
 }
 
+// Each memory on one line, so its line breaks aren't there to copy
 function memoryBlock(memories) {
     if (memories.length === 0) return 'memories: none about this';
-    return `memories:\n${memories.map((m) => `[${m.date}]\n${m.text}`).join('\n\n')}`;
+    return `memories:\n${memories.map((m) => `[${m.date}] ${m.text.split('\n').join(' | ')}`).join('\n')}`;
+}
+
+function turn(memories, asker, question) {
+    return `${memoryBlock(memories)}\n\n${asker} asks: ${question}`;
 }
 
 /**
@@ -67,12 +71,13 @@ function memoryBlock(memories) {
 function buildMessages({ question, asker, memories, postable }) {
     const messages = [{ role: 'system', content: systemPrompt(promptEmoji(postable)) }];
 
-    for (const { question: q, answer } of voice.examples) {
-        messages.push({ role: 'user', content: q });
-        messages.push({ role: 'assistant', content: answer });
+    // Past exchanges in the same shape as the real one: memories in, a new reply out
+    for (const example of voice.examples) {
+        messages.push({ role: 'user', content: turn(example.memories, 'someone', example.question) });
+        messages.push({ role: 'assistant', content: example.answer });
     }
 
-    messages.push({ role: 'user', content: `${memoryBlock(memories)}\n\n${asker} asks: ${question}` });
+    messages.push({ role: 'user', content: turn(memories, asker, question) });
     return messages;
 }
 

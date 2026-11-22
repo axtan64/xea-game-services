@@ -14,9 +14,10 @@ const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
 
 const CANDIDATES = 30;          // nearest chunks fetched before picking
 const BUDGET = 3600;            // characters of memory text shown to the model
-const MAX_CHUNK = 900;          // longest a single memory may be, so one chunk can't take the whole budget
+const MAX_CHUNK = 600;          // longest a single memory may be, so one chunk can't take the whole budget
 const MMR_LAMBDA = 0.7;         // 1 = only relevance, 0 = only difference from what's already picked
-const MIN_RELEVANCE = 0.2;      // cosine similarity below which a chunk is about something else
+const MIN_RELEVANCE = 0.25;     // cosine similarity below which a chunk is about something else
+const NEAR_BEST = 0.1;          // how far below the best match a chunk may be
 
 let db = null;
 let extractorPromise = null;
@@ -137,6 +138,12 @@ async function findMemories(question) {
         if (relevance < MIN_RELEVANCE) continue;
 
         candidates.push({ text, date: (row.start_time || '').slice(0, 7), relevance, vector });
+    }
+
+    // Loosely related chunks are what models end up pasting, so only those near the best match stay
+    const best = Math.max(...candidates.map((c) => c.relevance));
+    for (let i = candidates.length - 1; i >= 0; i--) {
+        if (candidates[i].relevance < best - NEAR_BEST) candidates.splice(i, 1);
     }
 
     const picked = [];
