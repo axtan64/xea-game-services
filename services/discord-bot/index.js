@@ -95,7 +95,6 @@ app.use('/docs.json', (req, res) => res.json(swaggerSpec)); // For gateway docum
 
 app.use('/track', require('./api/track')(bot));
 app.use('/purchase', require('./api/purchase')(bot));
-app.use('/tunnel', require('./api/tunnel')(bot));
 
 app.listen(PORT, () => {
     console.log(`Discord bot HTTP server running on port ${PORT}`);

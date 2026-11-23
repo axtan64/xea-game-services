@@ -1,0 +1,18 @@
+# What each hostname of xea-dev.com reaches on the Pi, through the tunnel "xea-pi" (docker-compose.yml here).
+# A new hostname needs its DNS record too: `cloudflared tunnel route dns xea-pi <hostname>`.
+
+tunnel: 80b0e847-ee22-47bb-827e-17d3acfcd57e
+credentials-file: /etc/cloudflared/creds/80b0e847-ee22-47bb-827e-17d3acfcd57e.json
+
+ingress:
+  # The game servers' API (Flags.BASE_URL in each game)
+  - hostname: api.xea-dev.com
+    service: http://localhost:3000
+  # The staff dashboard; its Roblox sign-in comes back to /auth/callback here (ROBLOX_OAUTH_REDIRECT_URI)
+  - hostname: www.xea-dev.com
+    service: http://localhost:3006
+  # SSH from anywhere: `ssh pi` through `cloudflared access ssh` (deployment/README.md). sshd takes keys only
+  # (/etc/ssh/sshd_config.d/10-keys-only.conf), since this hostname is open to the internet.
+  - hostname: ssh.xea-dev.com
+    service: ssh://localhost:22
+  - service: http_status:404

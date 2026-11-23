@@ -1,0 +1,14 @@
+# The named Cloudflare Tunnel "xea-pi", which puts the Pi on xea-dev.com
+
+name: xea-tunnel
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    user: "1002:1002"   # archie, who owns ~/.cloudflared
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./config.yml:/etc/cloudflared/config.yml:ro
+      - ${HOME}/.cloudflared:/etc/cloudflared/creds:ro

@@ -32,11 +32,7 @@ The gateway reloads its list of games every 30 seconds, so the new token starts 
 
 ### 3. Miscellaneous
 
-The game's base URL is the gateway's current tunnel URL. To print it:
-
-```bash
-docker compose logs cloudflared 2>&1 | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -n 1
-```
+The game's base URL is `https://api.xea-dev.com` (its `Flags.BASE_URL`). In Creator Hub, the game's gateway-token secret must allow that domain.
 
 ### 4. Fill in the Roblox config (optional until you need cross-server messages)
 
@@ -51,7 +47,7 @@ docker compose exec -w /app/shared/database users npm run update-game -- <slug> 
 ### 5. Check it works
 
 ```bash
-curl -i -H "Authorization: Bearer <token>" "<tunnel-url>/users/1"
+curl -i -H "Authorization: Bearer <token>" "https://api.xea-dev.com/users/1"
 ```
 
 | Response | Meaning |
@@ -65,6 +61,47 @@ To list the games that exist:
 ```bash
 docker compose exec -T postgres psql -U mining -d mining -c 'select slug, name, "createdAt" from "Game";'
 ```
+
+## The tunnel: xea-dev.com
+
+The Pi sits behind CGNAT, so nothing reaches it from outside except through the named Cloudflare Tunnel `xea-pi`. It connects out to Cloudflare and carries:
+
+| Hostname | Reaches on the Pi |
+|---|---|
+| `api.xea-dev.com` | the gateway (`localhost:3000`) |
+| `www.xea-dev.com` | the dashboard (`localhost:3006`). Its Roblox sign-in returns to `/auth/callback` there (`ROBLOX_OAUTH_REDIRECT_URI` in `.env`, and the Roblox OAuth app's redirect URLs). |
+| `ssh.xea-dev.com` | sshd (`localhost:22`) |
+
+It runs from `tunnel/` as a compose project of its own (`xea-tunnel`), so deploys never restart it and SSH survives a broken deploy. Its credentials live in `~/.cloudflared` on the Pi and never go in git. If it's ever stopped:
+
+```bash
+docker compose -f ~/Desktop/xea-game-services/deployment/tunnel/docker-compose.yml up -d
+```
+
+To add a hostname, add it to `tunnel/config.yml`, then give it a DNS record and restart the tunnel:
+
+```bash
+docker run --rm --user 1002:1002 -e HOME=/cfhome -w /cfhome/.cloudflared -v ~/.cloudflared:/cfhome/.cloudflared cloudflare/cloudflared:latest tunnel route dns xea-pi <hostname>
+docker compose -f ~/Desktop/xea-game-services/deployment/tunnel/docker-compose.yml restart
+```
+
+### SSH from anywhere
+
+sshd takes keys only (`/etc/ssh/sshd_config.d/10-keys-only.conf`), because `ssh.xea-dev.com` is open to the internet. On a computer whose key is in the Pi's `~/.ssh/authorized_keys`:
+
+1. Install cloudflared (on Windows, `winget install --id Cloudflare.cloudflared`).
+2. Add to `~/.ssh/config`, with the path to cloudflared on that computer:
+
+   ```
+   Host pi
+       HostName ssh.xea-dev.com
+       User archie
+       ProxyCommand "C:\Program Files (x86)\cloudflared\cloudflared.exe" access ssh --hostname %h
+   ```
+
+3. Connect with `ssh pi`.
+
+Until 2026-11-23 the gateway and the dashboard each had a Cloudflare quick tunnel instead, whose random `*.trycloudflare.com` URL changed on every restart and was posted to Discord by cron jobs.
 
 ## Rotating a token
 

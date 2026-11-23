@@ -7,13 +7,11 @@ const {
     MONEY_BAG: moneyBagEmoji,
     PENDING: pendingEmoji,
     BANK: bankEmoji,
-    LINK: linkEmoji,
 } = require('../resources/emojis');
 
 const COLOR_TRACK = 0xffd700;
 const COLOR_PURCHASE = 0x2ecc71;
 const COLOR_FUNDS = 0x52acff;
-const COLOR_TUNNEL = 0xf6821f;
 
 const ROBUX_TO_USD = 0.0038;
 
@@ -51,15 +49,6 @@ async function buildPurchaseEmbed({ userId, username, productName, robux, type, 
     };
 }
 
-async function buildTunnelEmbed({ url, label, note }) {
-    return {
-        title: `${linkEmoji} ${label ? `${label} ` : ''}Tunnel URL Changed`,
-        description: `${label ? `The ${label.toLowerCase()}'s` : `The backend's`} Cloudflare quick tunnel now points to:\n${url}` + (note ? `\n\n**${note}**` : ''),
-        color: COLOR_TUNNEL,
-        timestamp: new Date().toISOString(),
-    };
-}
-
 function buildFundsEmbed({ groupName, pending, total, iconUrl }) {
     const usd = (n) => (n * ROBUX_TO_USD).toFixed(2);
 
@@ -75,4 +64,4 @@ function buildFundsEmbed({ groupName, pending, total, iconUrl }) {
     };
 }
 
-module.exports = { buildTrackEmbed, buildPurchaseEmbed, buildTunnelEmbed, buildFundsEmbed, ROBUX_TO_USD };
+module.exports = { buildTrackEmbed, buildPurchaseEmbed, buildFundsEmbed, ROBUX_TO_USD };
