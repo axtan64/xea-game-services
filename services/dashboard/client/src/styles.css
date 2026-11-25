@@ -587,6 +587,9 @@ button.search-icon:hover { color: var(--interactive-hover); }
 /* Live cities */
 .facts { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; color: var(--muted); }
 .city-head { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+/* A person in a city the search names, ringed (Cities.jsx); the ring is an outline, so finding moves nothing */
+.person-slot { display: inline-flex; min-width: 0; max-width: 100%; border-radius: 999px; }
+.person-slot.found { outline: 2px solid var(--blurple); outline-offset: 3px; background: rgba(88, 101, 242, 0.18); }
 
 /* Picking servers to restart */
 .pick-head { display: flex; align-items: center; gap: 8px; margin-top: 16px; }

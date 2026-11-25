@@ -10,6 +10,7 @@ const { CutcPlayerStats, STAT_FIELDS: CUTC_STAT_FIELDS } = require('./models/Cut
 const CutcSaveSlot = require('./models/CutcSaveSlot');
 const CutcParty = require('./models/CutcParty');
 const CutcSlotAccess = require('./models/CutcSlotAccess');
+const CutcGlobalEvent = require('./models/CutcGlobalEvent');
 const Donation = require('./models/Donation');
 const MiningLike = require('./models/MiningLike');
 const CutcLike = require('./models/CutcLike');
@@ -43,6 +44,7 @@ module.exports = {
     CutcSaveSlot,
     CutcParty,
     CutcSlotAccess,
+    CutcGlobalEvent,
     Donation,
     MiningLike,
     CutcLike,

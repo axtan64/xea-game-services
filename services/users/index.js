@@ -26,12 +26,14 @@ const giftsRouter = require('./api/gifts');
 const likesRouter = require('./api/likes');
 const slotsRouter = require('./api/slots');
 const partiesRouter = require('./api/parties');
+const globalEventsRouter = require('./api/globalEvents');
 
 app.use(gameContext);
 app.use('/gifts', giftsRouter); // mounted before '/' - userRouter's /:userId would otherwise swallow it
 app.use('/likes', likesRouter); // mounted before '/' - userRouter's /:userId would otherwise swallow it
 app.use('/slots', slotsRouter); // likewise
 app.use('/parties', partiesRouter); // likewise
+app.use('/global-events', globalEventsRouter); // likewise
 app.use('/', userRouter);
 
 app.listen(PORT, () => {

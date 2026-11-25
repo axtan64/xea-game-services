@@ -287,3 +287,18 @@ model CutcLike {
     @@unique([userId, likingId])
     @@index([likingId])
 }
+// An event an admin sent to every Clean Up The City server
+model CutcGlobalEvent {
+    id        String    @id @default(uuid())
+    // what is it
+    kind      String
+    // an amount
+    amount    Int
+    // when the event ends
+    endsAt    DateTime?
+    // Roblox User ID of who started it
+    createdBy BigInt
+    createdAt DateTime  @default(now())
+
+    @@index([kind, endsAt])
+}

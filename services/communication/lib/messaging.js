@@ -93,11 +93,19 @@ async function publishSoftRestart(universeId, apiKey, order) {
     }
 }
 
+// Must match Topics.GlobalEvent on the Roblox side
+const GLOBAL_EVENT_TOPIC = 'GLOBAL_EVENT';
+
+function publishGlobalEvent(universeId, apiKey, event) {
+    return publishMessage(universeId, apiKey, GLOBAL_EVENT_TOPIC, event);
+}
+
 module.exports = {
     publishAnnouncement,
     publishProductGrant,
     publishAccountChanged,
     publishSoftRestart,
+    publishGlobalEvent,
     softRestartMessages,
     MAX_MESSAGE_BYTES,
 };
