@@ -89,6 +89,7 @@ services:
       - TRACK_CHANNEL_ID=1381949020007829640
       - PURCHASE_CHANNEL_ID=1517455874569011260
       - FUNDS_CHANNEL_ID=1565327548294893689
+      - MILESTONES_CHANNEL_ID=1565311768236916827 # new player peaks, sent by the dashboard's CCU poller
       - ROBLOX_GROUP_ID=13952572
       - ROBLOX_BOT_COOKIE=${ROBLOX_BOT_COOKIE} # seed only - once set, the dashboard's Setting row in Postgres takes over
       - DATABASE_URL=postgresql://mining:mining@postgres:5432/mining
@@ -118,6 +119,8 @@ services:
       - DASHBOARD_SESSION_SECRET=${DASHBOARD_SESSION_SECRET}
       # Announcements, gifts and account changes go out through it, with the game's Open Cloud key from its Game row
       - COMMUNICATION_SERVICE_URL=http://communication:3000
+      # New player peaks go to Discord's milestones channel through the bot (server/lib/ccu.js)
+      - DISCORD_BOT_URL=http://discord-bot:3002
     depends_on:
       - postgres
       - communication
