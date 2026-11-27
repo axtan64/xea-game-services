@@ -14,6 +14,9 @@ model Game {
     gatewayTokenHash      String            @unique
     robloxUniverseId      BigInt?
     robloxOpenCloudApiKey String?
+    // The most players in the game at once that the dashboard has seen (Roblox's games API `playing`), and when
+    peakCcu               Int               @default(0)
+    peakCcuAt             DateTime?
     createdAt             DateTime          @default(now())
     updatedAt             DateTime          @updatedAt
     memberships           GameMembership[]

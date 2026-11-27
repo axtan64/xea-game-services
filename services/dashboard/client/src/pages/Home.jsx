@@ -1,11 +1,56 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useApi } from '../api.js';
 import { Callout, ErrorText, Loading, Page, SectionTitle, Stat } from '../components.jsx';
-import { number, robux } from '../format.js';
+import { dateTime, number, robux, timeAgo } from '../format.js';
+import { acronym } from '../games.jsx';
 import { PurchaseTable } from './Purchases.jsx';
 
+// The server reads each game's players once a minute (server/lib/ccu.js), so the page asks again as often
+const REFRESH_MS = 60 * 1000;
+
+// The most players in each game at once, and how many are in it now, for every game with a universe ID
+function Concurrency({ games }) {
+    const tracked = games.filter((game) => game.universeId);
+    if (tracked.length === 0) return null;
+
+    // A row for each game; with more than one, each stat says whose it is
+    const named = (label, game) => (tracked.length > 1 ? `${label}, ${acronym(game.name)}` : label);
+
+    return (
+        <>
+            <SectionTitle>Highest CCU</SectionTitle>
+            <div className="stats-rows">
+                {tracked.map((game) => (
+                    <div className="stats" key={game.slug}>
+                        <Stat
+                            label={named('Highest ever', game)}
+                            value={number(game.peakCcu)}
+                            sub={game.peakCcuAt ? dateTime(game.peakCcuAt) : 'Nobody counted yet'}
+                        />
+                        <Stat
+                            label={named('CCU now', game)}
+                            value={game.ccuNow ? number(game.ccuNow.playing) : '—'}
+                            sub={game.ccuNow ? `Read ${timeAgo(game.ccuNow.at)}` : 'Not read yet'}
+                        />
+                    </div>
+                ))}
+            </div>
+            <p className="hint">
+                Players in every server at once, lobbies and cities, as Roblox counts them, read every minute. The
+                highest is kept from when the dashboard began reading, so an earlier peak isn't known.
+            </p>
+        </>
+    );
+}
+
 export default function Home() {
-    const { data, error, loading } = useApi('/api/overview');
+    const { data, error, loading, reload } = useApi('/api/overview');
+
+    useEffect(() => {
+        const timer = setInterval(reload, REFRESH_MS);
+        return () => clearInterval(timer);
+    }, [reload]);
 
     return (
         <Page title="Overview" icon="overview" topic="Every game">
@@ -20,6 +65,8 @@ export default function Home() {
                             gifts or live bans. <Link to="/games">Set them on Games</Link>.
                         </Callout>
                     ))}
+
+                    <Concurrency games={data.games} />
 
                     <SectionTitle>Clean Up The City</SectionTitle>
                     <div className="stats">

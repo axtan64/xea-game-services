@@ -12,6 +12,7 @@ app.use(cookieParser());
 
 const requireAuth = require('./middleware/requireAuth');
 const { purchasesRouter } = require('./api/purchases');
+const { startCcuPolling } = require('./lib/ccu');
 const { BanError } = require('./lib/robloxBans');
 
 app.use('/auth', require('./api/auth'));
@@ -43,4 +44,6 @@ app.use((req, res) => res.sendFile(path.join(clientDist, 'index.html')));
 
 app.listen(PORT, () => {
     console.log(`Dashboard running on port ${PORT}`);
+    // Every game's players at once, for the overview's Highest CCU and CCU now
+    startCcuPolling();
 });

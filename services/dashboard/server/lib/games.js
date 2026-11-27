@@ -1,4 +1,5 @@
 const { Game } = require('database');
+const { getCcuNow } = require('./ccu');
 const { isMessagingReady } = require('./communication');
 
 // How long a city's lock holds without a save or heartbeat. Must match LOCK_STALE_MS in services/users/api/slots.js
@@ -20,6 +21,10 @@ function describeGame(game) {
         hasApiKey: Boolean(game.robloxOpenCloudApiKey),
         apiKeyMasked: mask(game.robloxOpenCloudApiKey),
         messagingReady: isMessagingReady(game),
+        // Players in it at once: the most seen and when, and the last count read ({ playing, at }, or null)
+        peakCcu: game.peakCcu,
+        peakCcuAt: game.peakCcuAt,
+        ccuNow: getCcuNow(game),
     };
 }
 

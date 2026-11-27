@@ -40,6 +40,21 @@ class Game {
         });
     }
 
+    /**
+     * Records a count of players in the game at once as its peak, if it beats the one stored.
+     * @param {string} id The game's id.
+     * @param {number} playing How many players Roblox says are in it.
+     * @param {Date} at When Roblox said so.
+     * @returns {Promise<boolean>} Whether it was a new peak.
+     */
+    static async raisePeakCcu(id, playing, at = new Date()) {
+        const { count } = await getClient().game.updateMany({
+            where: { id, peakCcu: { lt: playing } },
+            data: { peakCcu: playing, peakCcuAt: at },
+        });
+        return count > 0;
+    }
+
     static update(slug, { name, robloxUniverseId, robloxOpenCloudApiKey }) {
         return getClient().game.update({
             where: { slug },

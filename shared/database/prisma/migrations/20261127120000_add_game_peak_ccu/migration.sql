@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Game" ADD COLUMN     "peakCcu" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "peakCcuAt" TIMESTAMP(3);
